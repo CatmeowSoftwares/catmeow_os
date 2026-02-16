@@ -2,29 +2,26 @@
 #![no_main]
 use core::panic::PanicInfo;
 
-#[unsafe(no_mangle)]
-fn main() {}
-
-static HELLO: &[u8] = b"Hello World!";
+use crate::vga_buffer::{Writer, print_something};
 
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {}
+fn panic(info: &PanicInfo) -> ! {
+    println!("{}", info);
+    loop{}
 }
+mod vga_buffer;
 
+static HELLO: &[u8] = b"Hello World!";
 
 #[unsafe(no_mangle)]
-pub extern "C" fn _start() -> ! {
-
-    let vga_buffer = 0xb8000 as *mut u8;
-    for (i, &byte) in HELLO.iter().enumerate() {
-        unsafe {
-            *vga_buffer.offset(i as isize * 2) = byte;
-            *vga_buffer.offset(i as isize * 2 + 1) = 0xb;
-        }
-    }
-
-
+pub extern  "C" fn _start() -> ! {
+    println!("{}", 1.0f64/3.0f64);
+    println!("print this");
+    panic!("meow :3");
     loop {}
 }
+
+
+
+
