@@ -1,0 +1,8 @@
+
+
+
+[unstable]
+json-target-spec = true
+build-std-features = ["compiler-builtins-mem"]
+build-std = ["core", "compiler_builtins"]
+target = "x86_64-catmeow_os.json"
