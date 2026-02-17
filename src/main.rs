@@ -1,26 +1,49 @@
 #![no_std]
 #![no_main]
+
+#![feature(custom_test_frameworks)]
+#![test_runner(catmeow_os::test_runner)]
+#![reexport_test_harness_main = "test_main"]
+
 use core::panic::PanicInfo;
+use catmeow_os::{print, println, vga_buffer::test_this};
 
-use crate::vga_buffer::{Writer, print_something};
+
+#[unsafe(no_mangle)]
+pub extern  "C" fn _start() -> ! {
+    
+
+    catmeow_os::init();
+
+    x86_64::instructions::interrupts::int3();
+    
+    #[cfg(test)]
+    test_main();
+
+    println!("it did not crash");
+    loop {}
+}
 
 
+
+
+
+
+
+#[cfg(not(test))]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
     loop{}
 }
-mod vga_buffer;
 
-static HELLO: &[u8] = b"Hello World!";
 
-#[unsafe(no_mangle)]
-pub extern  "C" fn _start() -> ! {
-    println!("{}", 1.0f64/3.0f64);
-    println!("print this");
-    panic!("meow :3");
-    loop {}
+#[cfg(test)]
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    catmeow_os::test_panic_handler(info);
 }
+
 
 
 

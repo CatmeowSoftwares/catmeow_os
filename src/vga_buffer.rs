@@ -150,14 +150,10 @@ impl fmt::Write for Writer {
     }
 }
 
-pub fn print_something() {
-    use core::fmt::Write;
-    write!(WRITER.lock(), " i am the meow :{}, i am {} years old :3\n", 3, 41.67).unwrap();
-    write!(WRITER.lock(), " i am the meow :{}, i am {} years old :3\n", 3, 41.67).unwrap();
-}
 
 use spin::Mutex;
 use lazy_static::lazy_static;
+
 
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
@@ -166,6 +162,9 @@ lazy_static! {
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer)},
     });
 }
+
+
+
 
 
 
@@ -184,4 +183,38 @@ macro_rules! println {
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     WRITER.lock().write_fmt(args).unwrap();
+}
+
+
+
+#[test_case]
+fn test_println_simple() {
+    println!("test_println_simple output");
+}
+
+#[test_case]
+fn test_println_many() {
+    for _ in 0..200 {
+        println!("test_println_many output");
+    }
+}
+
+
+#[test_case]
+fn test_println_output() {
+    let s = "Some test string that fits on a single line";
+    println!("{}", s);
+    for (i, c) in s.chars().enumerate() {
+        let screen_char = WRITER.lock().buffer.chars[BUFFER_HEIGHT - 2][i].read();
+        assert_eq!(char::from(screen_char.ascii_character), c);
+    }
+}
+
+
+
+pub fn test_this(x: usize, y: usize, byte: u8) {
+    WRITER.lock().buffer.chars[y][x].write(ScreenChar { 
+        ascii_character: byte, 
+        color_code: ColorCode::new(Color::Magenta, Color::Red),
+    });
 }

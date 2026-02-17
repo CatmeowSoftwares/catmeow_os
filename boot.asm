@@ -10,8 +10,8 @@ char:
 
 labal_again:
     mov al, [bx]
-    cmp al, 0
-    je exit
+    cmp al, 67
+    jne exit
     int 0x10
     inc bx
     jmp labal_again
