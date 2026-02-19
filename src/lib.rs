@@ -7,12 +7,18 @@
 
 use core::panic::PanicInfo;
 
-use crate::interrupts::PIC_1_OFFSET;
+#[cfg(test)]
+use bootloader::BootInfo;
+
+#[cfg(test)]
+use bootloader::entry_point;
+
 
 pub mod gdt;
 pub mod interrupts;
 pub mod serial;
 pub mod vga_buffer;
+pub mod memory;
 pub trait Testable {
     fn run(&self) -> ();
 }
@@ -44,9 +50,12 @@ pub fn test_panic_handler(info: &PanicInfo) -> ! {
     hlt_loop();
 }
 
+//#[unsafe(no_mangle)]
+//pub extern "C" fn _start() -> ! {
 #[cfg(test)]
-#[unsafe(no_mangle)]
-pub extern "C" fn _start() -> ! {
+entry_point!(test_kernel_main);
+#[cfg(test)]
+fn test_kernel_main(_boot_info: &'static BootInfo) -> ! {
     init();
     test_main();
     hlt_loop();
