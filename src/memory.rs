@@ -1,8 +1,8 @@
 
-use x86_64::{PhysAddr, VirtAddr, structures::paging::{PageTable, page_table}};
+use x86_64::{PhysAddr, VirtAddr, structures::paging::{FrameAllocator, OffsetPageTable, PageTable, PhysFrame, Size4KiB, page_table}};
 
 
-pub unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
+unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
     use x86_64::registers::control::Cr3;
 
     let (level_4_table_frame, _) = Cr3::read();
@@ -13,7 +13,7 @@ pub unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static
 }
 
 
-
+/*
 
 pub unsafe fn translate_addr(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Option<PhysAddr> {
     translate_addr_inner(addr, physical_memory_offset)
@@ -44,4 +44,71 @@ fn translate_addr_inner(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Opt
     }
 
     Some(frame.start_address() + u64::from(addr.page_offset()))
+}
+
+
+ */
+
+
+pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
+    unsafe {
+        let level_4_table = active_level_4_table(physical_memory_offset);
+        OffsetPageTable::new(level_4_table, physical_memory_offset)
+    }
+}
+
+
+
+
+
+
+
+pub struct EmptyAllocator;
+
+unsafe impl FrameAllocator<Size4KiB> for EmptyAllocator {
+    fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
+        None
+    }
+}
+
+
+use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+
+pub struct BootInfoFrameAllocator {
+    memory_map: &'static MemoryMap,
+    next: usize,
+}
+
+impl BootInfoFrameAllocator {
+    pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
+        Self {
+            memory_map: memory_map,
+            next: 0,
+        }
+    }
+
+    fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
+        let regions = self.memory_map.iter();
+        let usable_regions = regions.filter(
+            |r| r.region_type == MemoryRegionType::Usable
+        );
+        let addr_ranges = usable_regions.map(
+            |r| r.range.start_addr()..r.range.end_addr()
+        );
+
+        let frame_address = addr_ranges.flat_map(|r| r.step_by(4096));
+
+        frame_address.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
+    }
+}
+
+
+
+unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
+    fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
+
+        let frame = self.usable_frames().nth(self.next);
+        self.next += 1;
+        frame
+    }
 }
