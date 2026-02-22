@@ -84,7 +84,8 @@ impl Writer {
                 0x20..0x7e | b'\n' => self.write_byte(byte),
 
                 // not print ascii
-                _ => self.write_byte(0xfe),
+                //_ => self.write_byte(0xfe),
+                c => self.write_byte(c),
             }
         }
     }

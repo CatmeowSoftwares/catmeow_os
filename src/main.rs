@@ -5,7 +5,7 @@
 #![reexport_test_harness_main = "test_main"]
 
 use bootloader::{BootInfo, entry_point};
-use catmeow_os::{memory::{BootInfoFrameAllocator, EmptyAllocator, init}, println};
+use catmeow_os::{memory::{BootInfoFrameAllocator, EmptyAllocator, init}, print, println};
 use x86_64::structures::paging::{Page, Size4KiB, Translate, page};
 use core::panic::PanicInfo;
 
@@ -17,7 +17,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     catmeow_os::init();
     use x86_64::structures::paging::PageTable;
     use x86_64::VirtAddr;
-
+/*
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
 
     let mut mapper = unsafe { init(phys_mem_offset) };
@@ -34,7 +34,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
         println!("{:?} -> {:?}", virt, phys);
     }
 
-
     let page: Page<Size4KiB> = Page::containing_address(VirtAddr::new(0));
     let mut empty_allocator = EmptyAllocator;
 
@@ -42,11 +41,12 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     unsafe { page_ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e);}
 
 
+ */
 
     let mut frame_allocator= unsafe {
         BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
-
+    print_all_ascii();
     /*
     fn stack_overflow() {
         stack_overflow();
@@ -79,4 +79,13 @@ fn panic(info: &PanicInfo) -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     catmeow_os::test_panic_handler(info);
+}
+
+
+
+
+fn print_all_ascii() {
+    for c in 0..u8::MAX {
+        print!("{}",char::from(c));
+    }
 }
