@@ -5,7 +5,7 @@
 #![reexport_test_harness_main = "test_main"]
 
 use bootloader::{BootInfo, entry_point};
-use catmeow_os::{memory::{BootInfoFrameAllocator, EmptyAllocator, init}, print, println};
+use catmeow_os::{allocator, memory::{self, BootInfoFrameAllocator, EmptyAllocator, init}, print, println};
 use x86_64::structures::paging::{Page, Size4KiB, Translate, page};
 use core::panic::PanicInfo;
 
@@ -17,9 +17,17 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     catmeow_os::init();
     use x86_64::structures::paging::PageTable;
     use x86_64::VirtAddr;
-/*
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
 
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    let mut frame_allocator = unsafe {
+        BootInfoFrameAllocator::init(&boot_info.memory_map)
+    };
+
+
+    allocator::init_heap(&mut mapper, &mut frame_allocator)
+        .expect("heap init failed");
+/*  
     let mut mapper = unsafe { init(phys_mem_offset) };
     let addresses = [
         0xb8000,
@@ -43,10 +51,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
  */
 
-    let mut frame_allocator= unsafe {
-        BootInfoFrameAllocator::init(&boot_info.memory_map)
-    };
+
+    println!("meow {}", char::from(1));
     print_all_ascii();
+    extern crate alloc;
+    use alloc::{boxed::Box, vec, vec::Vec, rc::Rc};
+    let x = vec!["meow :3", "uwu", "i love cats"];
+    println!("{}", x[0]);
     /*
     fn stack_overflow() {
         stack_overflow();
