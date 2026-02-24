@@ -5,57 +5,55 @@
 #![reexport_test_harness_main = "test_main"]
 
 use bootloader::{BootInfo, entry_point};
-use catmeow_os::{allocator, memory::{self, BootInfoFrameAllocator, EmptyAllocator, init}, print, println};
-use x86_64::structures::paging::{Page, Size4KiB, Translate, page};
+use catmeow_os::{
+    allocator,
+    memory::{self, BootInfoFrameAllocator, EmptyAllocator, init},
+    print, println,
+};
 use core::panic::PanicInfo;
+use x86_64::structures::paging::{Page, Size4KiB, Translate, page};
 
 //#[unsafe(no_mangle)]
 //pub extern "C" fn _start(boot_info: &'static BootInfo)  -> ! {
 entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-
     catmeow_os::init();
-    use x86_64::structures::paging::PageTable;
     use x86_64::VirtAddr;
+    use x86_64::structures::paging::PageTable;
 
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe {
-        BootInfoFrameAllocator::init(&boot_info.memory_map)
-    };
+    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
+
+    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap init failed");
+    /*
+       let mut mapper = unsafe { init(phys_mem_offset) };
+       let addresses = [
+           0xb8000,
+           0x201008,
+           0x0100_0020_1a10,
+           boot_info.physical_memory_offset,
+       ];
+
+       for &address in &addresses {
+           let virt = VirtAddr::new(address);
+           let phys = mapper.translate_addr(virt);//unsafe { translate_addr(virt, phys_mem_offset) };
+           println!("{:?} -> {:?}", virt, phys);
+       }
+
+       let page: Page<Size4KiB> = Page::containing_address(VirtAddr::new(0));
+       let mut empty_allocator = EmptyAllocator;
+
+       let page_ptr: *mut u64 = page.start_address().as_mut_ptr();
+       unsafe { page_ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e);}
 
 
-    allocator::init_heap(&mut mapper, &mut frame_allocator)
-        .expect("heap init failed");
-/*  
-    let mut mapper = unsafe { init(phys_mem_offset) };
-    let addresses = [
-        0xb8000,
-        0x201008,
-        0x0100_0020_1a10,
-        boot_info.physical_memory_offset,
-    ];
-    
-    for &address in &addresses {
-        let virt = VirtAddr::new(address);
-        let phys = mapper.translate_addr(virt);//unsafe { translate_addr(virt, phys_mem_offset) };
-        println!("{:?} -> {:?}", virt, phys);
-    }
-
-    let page: Page<Size4KiB> = Page::containing_address(VirtAddr::new(0));
-    let mut empty_allocator = EmptyAllocator;
-
-    let page_ptr: *mut u64 = page.start_address().as_mut_ptr();
-    unsafe { page_ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e);}
-
-
- */
-
+    */
 
     println!("meow {}", char::from(1));
     print_all_ascii();
     extern crate alloc;
-    use alloc::{boxed::Box, vec, vec::Vec, rc::Rc};
+    use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
     let x = vec!["meow :3", "uwu", "i love cats"];
     println!("{}", x[0]);
     /*
@@ -65,7 +63,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     stack_overflow();
      */
     //x86_64::instructions::interrupts::int3();
-    
+
     #[cfg(test)]
     test_main();
 
@@ -92,11 +90,8 @@ fn panic(info: &PanicInfo) -> ! {
     catmeow_os::test_panic_handler(info);
 }
 
-
-
-
 fn print_all_ascii() {
     for c in 0..u8::MAX {
-        print!("{}",char::from(c));
+        print!("{}", char::from(c));
     }
 }

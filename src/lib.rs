@@ -15,12 +15,12 @@ use bootloader::entry_point;
 
 extern crate alloc;
 
+pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
+pub mod memory;
 pub mod serial;
 pub mod vga_buffer;
-pub mod memory;
-pub mod allocator;
 pub trait Testable {
     fn run(&self) -> ();
 }

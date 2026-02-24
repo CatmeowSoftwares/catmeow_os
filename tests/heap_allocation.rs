@@ -4,32 +4,26 @@
 #![test_runner(catmeow_os::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 extern crate alloc;
-use bootloader::{entry_point, BootInfo};
+use bootloader::{BootInfo, entry_point};
 use catmeow_os::{allocator::HEAP_SIZE, println};
 use core::panic::PanicInfo;
 
 entry_point!(main);
 
 fn main(boot_info: &'static BootInfo) -> ! {
-
-
     use catmeow_os::allocator;
     use catmeow_os::memory::{self, BootInfoFrameAllocator};
     use x86_64::VirtAddr;
 
     catmeow_os::init();
-    let phys_mem_offset =  VirtAddr::new(boot_info.physical_memory_offset);
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe {
-        BootInfoFrameAllocator::init(&boot_info.memory_map)
-    };
+    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
 
-    allocator::init_heap(&mut mapper, &mut frame_allocator)
-        .expect("heap init failed");
+    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap init failed");
 
     test_main();
-    loop{}
-
+    loop {}
 }
 
 #[panic_handler]
@@ -37,10 +31,7 @@ fn panic(info: &PanicInfo) -> ! {
     catmeow_os::test_panic_handler(info);
 }
 
-
-
 use alloc::{boxed::Box, vec::Vec};
-
 
 #[test_case]
 fn simple_allocation() {
@@ -48,9 +39,7 @@ fn simple_allocation() {
     let heap_value_2 = Box::new(67);
     assert_eq!(*heap_value_1, 41);
     assert_eq!(*heap_value_2, 67);
-
 }
-
 
 #[test_case]
 fn large_vec() {
@@ -59,9 +48,8 @@ fn large_vec() {
     for i in 0..n {
         vec.push(i);
     }
-    assert_eq!(vec.iter().sum::<u64>(), (n - 1) * n/2);
+    assert_eq!(vec.iter().sum::<u64>(), (n - 1) * n / 2);
 }
-
 
 #[test_case]
 fn many_boxes() {

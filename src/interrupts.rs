@@ -38,10 +38,9 @@ lazy_static! {
     };
 }
 
-
 extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame,
-    error_code: PageFaultErrorCode
+    error_code: PageFaultErrorCode,
 ) {
     use x86_64::registers::control::Cr2;
 
@@ -52,16 +51,16 @@ extern "x86-interrupt" fn page_fault_handler(
     hlt_loop();
 }
 
-
-
 extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
     use x86_64::instructions::port::Port;
 
-
     lazy_static! {
         static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
-        Mutex::new(Keyboard::new(ScancodeSet1::new(),
-        layouts::Us104Key, HandleControl::Ignore));
+            Mutex::new(Keyboard::new(
+                ScancodeSet1::new(),
+                layouts::Us104Key,
+                HandleControl::Ignore
+            ));
     }
 
     let mut keyboard = KEYBOARD.lock();
@@ -74,7 +73,6 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
                 DecodedKey::Unicode(character) => print!("{}", character),
                 DecodedKey::RawKey(key) => print!("{:?}", key),
             }
-
         }
     }
     unsafe {

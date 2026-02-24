@@ -1,6 +1,9 @@
-
-use x86_64::{PhysAddr, VirtAddr, structures::paging::{FrameAllocator, OffsetPageTable, PageTable, PhysFrame, Size4KiB, page_table}};
-
+use x86_64::{
+    PhysAddr, VirtAddr,
+    structures::paging::{
+        FrameAllocator, OffsetPageTable, PageTable, PhysFrame, Size4KiB, page_table,
+    },
+};
 
 unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
     use x86_64::registers::control::Cr3;
@@ -11,7 +14,6 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
     let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
     unsafe { &mut *page_table_ptr }
 }
-
 
 /*
 
@@ -49,19 +51,12 @@ fn translate_addr_inner(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Opt
 
  */
 
-
 pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
     unsafe {
         let level_4_table = active_level_4_table(physical_memory_offset);
         OffsetPageTable::new(level_4_table, physical_memory_offset)
     }
 }
-
-
-
-
-
-
 
 pub struct EmptyAllocator;
 
@@ -70,7 +65,6 @@ unsafe impl FrameAllocator<Size4KiB> for EmptyAllocator {
         None
     }
 }
-
 
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 
@@ -89,12 +83,8 @@ impl BootInfoFrameAllocator {
 
     fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
         let regions = self.memory_map.iter();
-        let usable_regions = regions.filter(
-            |r| r.region_type == MemoryRegionType::Usable
-        );
-        let addr_ranges = usable_regions.map(
-            |r| r.range.start_addr()..r.range.end_addr()
-        );
+        let usable_regions = regions.filter(|r| r.region_type == MemoryRegionType::Usable);
+        let addr_ranges = usable_regions.map(|r| r.range.start_addr()..r.range.end_addr());
 
         let frame_address = addr_ranges.flat_map(|r| r.step_by(4096));
 
@@ -102,11 +92,8 @@ impl BootInfoFrameAllocator {
     }
 }
 
-
-
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
-
         let frame = self.usable_frames().nth(self.next);
         self.next += 1;
         frame

@@ -1,0 +1,85 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug unit tests in library 'catmeow_os'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'catmeow_os'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=catmeow_os"
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in executable 'catmeow_os'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=catmeow_os"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'basic_boot'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=basic_boot"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'heap_allocation'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=heap_allocation"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'should_panic'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=should_panic"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'stack_overflow'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=stack_overflow"
+                ]
+            }
+        }
+    ]
+}
