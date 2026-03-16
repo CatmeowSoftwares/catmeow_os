@@ -2,6 +2,8 @@
 #![no_main]
 
 use core::arch::asm;
+use core::ffi::{CStr, c_char, c_void};
+use core::ptr::null;
 
 use limine::BaseRevision;
 use limine::request::{FramebufferRequest, RequestsEndMarker, RequestsStartMarker};
@@ -34,11 +36,76 @@ unsafe extern "C" fn kmain() -> ! {
 
     if let Some(framebuffer_response) = FRAMEBUFFER_REQUEST.get_response() {
         if let Some(framebuffer) = framebuffer_response.framebuffers().next() {
+            let a;
+            unsafe {
+                /*
+                flanterm::sys::flanterm_fb_init(
+                    malloc,
+                    free,
+                    framebuffer,
+                    width,
+                    height,
+                    pitch,
+                    red_mask_size,
+                    red_mask_shift,
+                    green_mask_size,
+                    green_mask_shift,
+                    blue_mask_size,
+                    blue_mask_shift,
+                    canvas,
+                    ansi_colours,
+                    ansi_bright_colours,
+                    default_bg,
+                    default_fg,
+                    default_bg_bright,
+                    default_fg_bright,
+                    font,
+                    font_width,
+                    font_height,
+                    font_spacing,
+                    font_scale_x,
+                    font_scale_y,
+                    margin,
+                );
+                 */
+
+                a = flanterm::sys::flanterm_fb_init(
+                    None,
+                    None,
+                    framebuffer.addr() as *mut u32,
+                    framebuffer.width() as usize,
+                    framebuffer.height() as usize,
+                    100,
+                    100,
+                    100,
+                    100,
+                    100,
+                    100,
+                    100,
+                    0 as *mut u32,
+                    0 as *mut u32,
+                    0 as *mut u32,
+                    0 as *mut u32,
+                    0 as *mut u32,
+                    0 as *mut u32,
+                    0 as *mut u32,
+                    0 as *mut c_void,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                );
+                let msg = CStr::from_bytes_with_nul_unchecked(b"meow :3");
+                flanterm::sys::flanterm_write(a, msg.as_ptr(), msg.count_bytes());
+            }
+
             for i in 0..100_u64 {
                 // Calculate the pixel offset using the framebuffer information we obtained above.
                 // We skip `i` scanlines (pitch is provided in bytes) and add `i * 4` to skip `i` pixels forward.
                 let pixel_offset = i * framebuffer.pitch() + i * 4;
-
+                framebuffer.addr();
                 // Write 0xFFFFFFFF to the provided pixel offset to fill it white.
                 unsafe {
                     framebuffer
