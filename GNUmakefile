@@ -9,7 +9,7 @@ override USER_VARIABLE = $(if $(filter $(origin $(1)),default undefined),$(eval 
 $(call USER_VARIABLE,KARCH,x86_64)
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-$(call USER_VARIABLE,QEMUFLAGS,-m 2G)
+$(call USER_VARIABLE,QEMUFLAGS,-m 2G -serial stdio -d int -D qemu.log)
 
 override IMAGE_NAME := template-$(KARCH)
 
@@ -154,6 +154,10 @@ $(IMAGE_NAME).iso: limine/limine kernel
 	mkdir -p iso_root/boot/limine
 	cp -v limine.conf iso_root/boot/limine/
 	mkdir -p iso_root/EFI/BOOT
+
+	tar -cvf ramdisk.tar "root"
+	mkdir -p iso_root/
+	cp -v ramdisk.tar iso_root
 ifeq ($(KARCH),x86_64)
 	cp -v limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/boot/limine/
 	cp -v limine/BOOTX64.EFI iso_root/EFI/BOOT/
