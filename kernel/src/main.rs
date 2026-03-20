@@ -7,7 +7,7 @@ use catmeow_os::idt::init_idt;
 use catmeow_os::pmm::BootInfoFrameAllocator;
 use catmeow_os::serial::init_serial;
 use catmeow_os::terminal::init_terminal;
-use catmeow_os::vmm::{alloc_page, init_heap};
+use catmeow_os::vmm::{alloc_page, dealloc_page, init_heap};
 use catmeow_os::{gdt::init_gdt, serial_println};
 use catmeow_os::{pmm, terminal_print, terminal_println};
 use core::arch::asm;
@@ -105,6 +105,7 @@ unsafe extern "C" fn kmain() -> ! {
             alloc_page(0xdeadbeef, 4096, &mut frame_allocator, &mut mapper).unwrap();
             let ptr = 0xdeadbeef as *mut u8;
             unsafe {
+                //dealloc_page(0xdeadbeef, 4096,&mut mapper);
                 let deref_ptr = *ptr;
                 terminal_println!("{}", deref_ptr);
             }
@@ -135,9 +136,6 @@ unsafe extern "C" fn kmain() -> ! {
             let a = &data[0..4];
             let c = String::from_utf8(a.into()).unwrap();
             terminal_println!("{:?}", c);
-            for c in data {
-                terminal_print!("{}", c.to_string());
-            }
         }
     }
     hcf();
