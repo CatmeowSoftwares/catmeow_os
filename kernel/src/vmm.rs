@@ -7,7 +7,8 @@ use spin::{MutexGuard, mutex::Mutex};
 use x86_64::{
     VirtAddr, addr,
     structures::paging::{
-        FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB, mapper::MapToError,
+        FrameAllocator, Mapper, Page, PageTableFlags, PhysFrame, Size4KiB,
+        mapper::{MapToError, MapperFlush, UnmapError},
     },
 };
 
@@ -36,6 +37,41 @@ pub fn alloc_page(
     }
 
     Ok(())
+}
+
+pub fn dealloc_page(
+    start: u64,
+    size: u64,
+    mapper: &mut impl Mapper<Size4KiB>,
+) -> Result<(), MapToError<Size4KiB>> {
+    let page_range = {
+        let start1 = VirtAddr::new(start);
+        let end1 = start1 + size - 1u64;
+        let page_start: Page<Size4KiB> = Page::containing_address(start1);
+        let page_end = Page::containing_address(end1);
+        Page::range_inclusive(page_start, page_end)
+    };
+
+    for page in page_range {
+        let err = mapper.unmap(page);
+        match err {
+            Ok(val) => {
+                terminal_println!("deallocated page: {:?}", val);
+            }
+            Err(err) => {
+                terminal_println!("error: {:?}", err);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn dealloc_page1(
+    page: Page<Size4KiB>,
+    mapper: &mut impl Mapper<Size4KiB>,
+) -> Result<(PhysFrame<Size4KiB>, MapperFlush<Size4KiB>), UnmapError> {
+    mapper.unmap(page)
 }
 
 struct Locked<A> {
