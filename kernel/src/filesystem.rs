@@ -67,7 +67,11 @@ impl Directory {
                     None
                 }
             })
-            .collect()  
+            .collect()
+    }
+
+    pub fn move_directory(&mut self, directory: Directory) {
+        self.files.push(FileType::Directory(directory));
     }
 }
 pub fn create_directory(name: impl Into<String>) {}
