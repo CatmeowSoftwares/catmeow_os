@@ -5,6 +5,7 @@ use catmeow_os::alloc::string::{String, ToString};
 use catmeow_os::filesystem::Directory;
 use catmeow_os::idt::init_idt;
 use catmeow_os::pmm::BootInfoFrameAllocator;
+use catmeow_os::scheduler::{Process, Scheduler};
 use catmeow_os::serial::init_serial;
 use catmeow_os::terminal::init_terminal;
 use catmeow_os::vmm::{alloc_page, dealloc_page, init_heap};
@@ -130,6 +131,11 @@ unsafe extern "C" fn kmain() -> ! {
         root.move_file(file);
         terminal_println!("{:#?}", entry);
     }
+
+    let processes: Vec<Process> = Vec::new();
+
+    let scheduler: Scheduler = Scheduler::new();
+
     for file in root.files() {
         if file.name == "root/print".to_string() {
             let data = file.data();
@@ -137,6 +143,7 @@ unsafe extern "C" fn kmain() -> ! {
             let c = String::from_utf8(a.into()).unwrap();
             terminal_println!("{:?}", c);
         }
+        if file.name == "root/hello_world.bin".to_string() {}
     }
     hcf();
 }
