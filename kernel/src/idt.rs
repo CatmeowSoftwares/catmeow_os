@@ -20,24 +20,59 @@ lazy_static! {
         idt.device_not_available.set_handler_fn(handler);
         idt.double_fault.set_handler_fn(double_fault);
         idt.invalid_tss.set_handler_fn(invalid_tss);
-        idt.segment_not_present.set_handler_fn(invalid_tss);
-        idt.stack_segment_fault.set_handler_fn(invalid_tss);
-        idt.general_protection_fault.set_handler_fn(invalid_tss);
+        idt.segment_not_present.set_handler_fn(segment_not_present);
+        idt.stack_segment_fault.set_handler_fn(stack_segment_fault);
+        idt.general_protection_fault
+            .set_handler_fn(general_protection_fault);
         idt.page_fault.set_handler_fn(page_fault);
         idt.x87_floating_point.set_handler_fn(handler);
-        idt.alignment_check.set_handler_fn(invalid_tss);
+        idt.alignment_check.set_handler_fn(alignment_check);
         idt.machine_check.set_handler_fn(machine_check);
         idt.simd_floating_point.set_handler_fn(handler);
         idt.virtualization.set_handler_fn(handler);
-        idt.cp_protection_exception.set_handler_fn(invalid_tss);
+        idt.cp_protection_exception
+            .set_handler_fn(cp_protection_exception);
         idt.hv_injection_exception.set_handler_fn(handler);
-        idt.vmm_communication_exception.set_handler_fn(invalid_tss);
-        idt.security_exception.set_handler_fn(invalid_tss);
+        idt.vmm_communication_exception
+            .set_handler_fn(vmm_communication_exception);
+        idt.security_exception.set_handler_fn(security_exception);
         idt
     };
 }
 extern "x86-interrupt" fn handler(stack_frame: InterruptStackFrame) {
     serial_println!("{:#?}", stack_frame);
+}
+
+extern "x86-interrupt" fn segment_not_present(stack_frame: InterruptStackFrame, err: u64) {
+    serial_println!("segment_not_present: {:#?}, {:#?}", stack_frame, err);
+}
+
+extern "x86-interrupt" fn stack_segment_fault(stack_frame: InterruptStackFrame, err: u64) {
+    serial_println!("stack_segment_fault: {:#?}, {:#?}", stack_frame, err);
+}
+
+extern "x86-interrupt" fn general_protection_fault(stack_frame: InterruptStackFrame, err: u64) {
+    serial_println!("general_protection_fault: {:#?}, {:#?}", stack_frame, err);
+}
+
+extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, err: u64) {
+    serial_println!("alignment_check: {:#?}, {:#?}", stack_frame, err);
+}
+
+extern "x86-interrupt" fn cp_protection_exception(stack_frame: InterruptStackFrame, err: u64) {
+    serial_println!("cp_protection_exception: {:#?}, {:#?}", stack_frame, err);
+}
+
+extern "x86-interrupt" fn vmm_communication_exception(stack_frame: InterruptStackFrame, err: u64) {
+    serial_println!(
+        "vmm_communication_exception: {:#?}, {:#?}",
+        stack_frame,
+        err
+    );
+}
+
+extern "x86-interrupt" fn security_exception(stack_frame: InterruptStackFrame, err: u64) {
+    serial_println!("security_exception: {:#?}, {:#?}", stack_frame, err);
 }
 
 extern "x86-interrupt" fn divide_error(stack_frame: InterruptStackFrame) {
