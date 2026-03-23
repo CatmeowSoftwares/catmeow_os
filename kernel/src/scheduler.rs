@@ -1,11 +1,16 @@
-use core::{arch::asm, ptr::copy};
+use core::{
+    arch::{self, asm},
+    ptr::{copy, copy_nonoverlapping},
+};
 
 use alloc::boxed::Box;
 use x86_64::{
     PhysAddr,
     registers::control::{Cr3, Cr3Flags},
-    structures::paging::{PhysFrame, Size4KiB},
+    structures::paging::{FrameAllocator, Mapper, PhysFrame, Size4KiB},
 };
+
+use crate::{serial_println, terminal_println, vmm::alloc_page};
 
 pub struct Register {
     rip: u64,
@@ -137,6 +142,41 @@ fn switch_page_directory(process: &mut Process) {
     }
 }
 
-pub fn load_bin(data: *mut u8, size: usize) {
+pub fn load_bin(
+    data: *mut u8,
+    size: usize,
+    scheduler: &mut Scheduler,
+    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
+    mapper: &mut impl Mapper<Size4KiB>,
+) {
     let process = Box::new(Process::new());
+
+    scheduler.current_process = Some(&mut *Box::leak(process));
+
+    let entry_addr = 0x400000usize;
+
+    match alloc_page(entry_addr as u64, size as u64, frame_allocator, mapper) {
+        Ok(v) => {
+            serial_println!("{:?}", v);
+        }
+        Err(err) => {
+            serial_println!("{:?}", err);
+            return;
+        }
+    }
+    unsafe {
+        copy_nonoverlapping(data, entry_addr as *mut u8, size);
+    }
+
+    serial_println!("entry = {:x}", entry_addr);
+    for i in 0..16 {
+        unsafe {
+            serial_println!("byte[{}] = {:02x}", i, *data.add(i));
+        }
+    }
+
+    let entry: extern "C" fn() = unsafe { core::mem::transmute(entry_addr as usize) };
+
+    //entry();
+    serial_println!("test");
 }

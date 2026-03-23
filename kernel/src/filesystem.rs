@@ -56,6 +56,18 @@ impl Directory {
             })
             .collect()
     }
+    pub fn files_mut(&mut self) -> Vec<&mut File> {
+        self.files
+            .iter_mut()
+            .filter_map(|f| {
+                if let FileType::File(file) = f {
+                    Some(file)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 
     pub fn directories(&self) -> Vec<&Directory> {
         self.files

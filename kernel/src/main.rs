@@ -2,10 +2,10 @@
 #![no_main]
 
 use catmeow_os::alloc::string::{String, ToString};
-use catmeow_os::filesystem::Directory;
+use catmeow_os::filesystem::{self, Directory};
 use catmeow_os::idt::init_idt;
 use catmeow_os::pmm::BootInfoFrameAllocator;
-use catmeow_os::scheduler::{Process, Scheduler};
+use catmeow_os::scheduler::{Process, Scheduler, load_bin};
 use catmeow_os::serial::init_serial;
 use catmeow_os::terminal::init_terminal;
 use catmeow_os::vmm::{alloc_page, dealloc_page, init_heap};
@@ -110,40 +110,48 @@ unsafe extern "C" fn kmain() -> ! {
                 let deref_ptr = *ptr;
                 terminal_println!("{}", deref_ptr);
             }
+
+            extern crate alloc;
+            use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
+
+            let file = get_ramdisk_file();
+            let sliz = &*slice_from_raw_parts_mut(file.addr(), file.size() as usize);
+            let archive = tar_no_std::TarArchiveRef::new(sliz).unwrap();
+            let entries = archive.entries().collect::<Vec<_>>();
+
+            terminal_println!();
+            serial_println!("meow :3");
+            serial_println!("filesystem");
+
+            let mut root = Directory::new("root");
+            for entry in entries {
+                let file = catmeow_os::filesystem::File::new(entry.filename().as_str().unwrap())
+                    .with_data(entry.data());
+                root.move_file(file);
+                terminal_println!("{:#?}", entry);
+            }
+
+            let processes: Vec<Process> = Vec::new();
+
+            let mut scheduler: Scheduler = Scheduler::new();
+            for file in root.files_mut() {
+                if file.name == "root/print".to_string() {
+                    let data = file.data();
+                    let a = &data[0..4];
+                    let c = String::from_utf8(a.into()).unwrap();
+                    terminal_println!("{:?}", c);
+                }
+                if file.name == "root/hello_world.bin".to_string() {
+                    load_bin(
+                        file.data.as_mut_ptr(),
+                        file.data.len(),
+                        &mut scheduler,
+                        &mut frame_allocator,
+                        &mut mapper,
+                    );
+                }
+            }
         }
-    }
-    extern crate alloc;
-    use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
-
-    let file = get_ramdisk_file();
-    let sliz = &*slice_from_raw_parts_mut(file.addr(), file.size() as usize);
-    let archive = tar_no_std::TarArchiveRef::new(sliz).unwrap();
-    let entries = archive.entries().collect::<Vec<_>>();
-
-    terminal_println!();
-    serial_println!("meow :3");
-    serial_println!("filesystem");
-
-    let mut root = Directory::new("root");
-    for entry in entries {
-        let file = catmeow_os::filesystem::File::new(entry.filename().as_str().unwrap())
-            .with_data(entry.data());
-        root.move_file(file);
-        terminal_println!("{:#?}", entry);
-    }
-
-    let processes: Vec<Process> = Vec::new();
-
-    let scheduler: Scheduler = Scheduler::new();
-
-    for file in root.files() {
-        if file.name == "root/print".to_string() {
-            let data = file.data();
-            let a = &data[0..4];
-            let c = String::from_utf8(a.into()).unwrap();
-            terminal_println!("{:?}", c);
-        }
-        if file.name == "root/hello_world.bin".to_string() {}
     }
     hcf();
 }
