@@ -45,6 +45,7 @@ impl IDTEntry {
 }
 
 fn exception_handler() -> ! {
+    serial_println!("exception!");
     loop {
         unsafe {
             asm!("hlt");
@@ -55,17 +56,15 @@ fn exception_handler() -> ! {
 const GDT_OFFSET_KERNEL_CODE: u16 = 0x08;
 
 fn idt_set_descriptor(vector: u8, isr: *mut u8, flags: u8) {
-    let idt = unsafe { IDT.get() };
-    unsafe {
-        let descriptor = &mut (*idt)[vector as usize];
-        descriptor.isr_low = isr as u16 & 0xffff;
-        descriptor.kernel_cs = GDT_OFFSET_KERNEL_CODE;
-        descriptor.ist = 0;
-        descriptor.attributes = flags;
-        descriptor.isr_mid = ((isr as u64 >> 16) & 0xffff) as u16;
-        descriptor.isr_high = ((isr as u64 >> 32) & 0xffffffff) as u32;
-        descriptor.reserved = 0;
-    }
+    let idt = unsafe { &mut *IDT.get() };
+    let descriptor = &mut idt[vector as usize];
+    descriptor.isr_low = isr as u16 & 0xffff;
+    descriptor.kernel_cs = GDT_OFFSET_KERNEL_CODE;
+    descriptor.ist = 0;
+    descriptor.attributes = flags;
+    descriptor.isr_mid = ((isr as u64 >> 16) & 0xffff) as u16;
+    descriptor.isr_high = ((isr as u64 >> 32) & 0xffffffff) as u32;
+    descriptor.reserved = 0;
 }
 
 static VECTORS: SyncUnsafeCell<[bool; IDT_MAX_DESCRIPTORS]> =
@@ -82,28 +81,29 @@ pub fn init_idt() {
         idtr.limit = (IDT_MAX_DESCRIPTORS * size_of::<IDTEntry>() - 1) as u16;
         let isr_stub_table = &mut *ISR_STUB_TABLE.get();
         let vectors = &mut *VECTORS.get();
-        //isr_stub_table[3] = breakpoint_handler as u64;
-        //vectors[3 as usize] = true;
         for vector in 0..32 {
-            idt_set_descriptor(vector, isr_stub_table[vector as usize] as *mut u8, 0x8e);
+            //idt_set_descriptor(vector, isr_stub_table[vector as usize] as *mut u8, 0x8e);
+            idt_set_descriptor(vector, exception_handler as *mut u8, 0x8e);
             vectors[vector as usize] = true;
         }
-        idt_set_descriptor(3, breakpoint_handler as *mut u8, 0x8e);
-        idt_set_descriptor(0x08, double_fault_handler as *mut u8, 0x8e);
-        asm!("lidt [{}]", in(reg) idtr, options(readonly, nostack, preserves_flags));
-        asm!("sti", options(nostack));
-
+        lidt(idtr);
+        enable_interrupts();
         serial_println!("IDT INITIALIZED");
-        asm!("int3");
     }
 }
 
-extern "x86-interrupt" fn breakpoint_handler(a: u8) {
-    serial_println!("BREAKPOINT: {:#?}", a);
-    loop {}
+pub fn disable_interrupts() {
+    unsafe {
+        asm!("cli", options(nostack));
+    }
 }
-
-extern "x86-interrupt" fn double_fault_handler(a: u8) {
-    serial_println!("DOUBLE FAULT: {:#?}", a);
-    loop {}
+pub fn enable_interrupts() {
+    unsafe {
+        asm!("sti", options(nostack));
+    }
+}
+fn lidt(idtr: &IDTR) {
+    unsafe {
+        asm!("lidt [{}]", in(reg) idtr, options(readonly, nostack, preserves_flags));
+    }
 }
