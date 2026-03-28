@@ -1,157 +1,103 @@
 //bitmap allocator
 // n/8 bytes
 
-use core::{cell::SyncUnsafeCell, ptr::null_mut};
-
-use crate::{linked_list::LinkedList, serial_println};
+use crate::serial_println;
+use core::{
+    cell::SyncUnsafeCell,
+    ptr::{eq, null_mut},
+};
 use limine::memory_map::{Entry, EntryType};
-#[derive(Debug, Clone, Copy)]
-struct PageFrame {
-    start: u64,
-    size: u64,
-    used: bool,
-}
+const PAGE_SIZE: u64 = 4096;
 
-struct PageTable1 {}
-struct PageTable2 {
-    page_1: PageTable1,
-}
-struct PageTable3 {
-    page_2: PageTable2,
-}
-struct PageTable4 {
-    page_3: PageTable3,
-}
-impl PageFrame {
-    const fn new(start: u64, size: u64) -> Self {
-        Self {
-            start,
-            size,
-            used: false,
-        }
-    }
-    fn free(&mut self) {
-        self.used = false;
-    }
-    fn is_empty(&self) -> bool {
-        self.size == 0
-    }
-}
-static FRAME_MAP: SyncUnsafeCell<[PageFrame; 1024]> =
-    SyncUnsafeCell::new([PageFrame::new(0, 0); 1024]);
-#[derive(Debug, Clone, Copy)]
 struct Region {
-    previous_addr: u64,
-    next_addr: u64,
-    size: u64,
+    next: *mut Region,
 }
-
-impl Region {
-    const fn new(previous_addr: u64, size: u64) -> Self {
-        Self {
-            previous_addr,
-            size,
-            next_addr: 0,
-        }
-    }
-    fn is_empty(&self) -> bool {
-        self.size == 0
-    }
-}
-struct ListNode {
-    next: Option<&'static ListNode>,
-    previous_addr: u64,
-    next_addr: u64,
-}
-impl ListNode {
-    const fn new(prev: u64, next: u64) -> Self {
-        Self {
-            next: None,
-            previous_addr: prev,
-            next_addr: next,
-        }
-    }
-    fn as_u64(&self) -> u64 {
-        self.as_ptr() as u64
-    }
-    fn as_ptr(&self) -> *const ListNode {
-        self as *const ListNode
-    }
-    fn as_ptr_mut(&mut self) -> *mut ListNode {
-        self as *mut ListNode
-    }
-}
-struct FreelistAllocator {
-    head: ListNode,
-}
-const PAGE_SIZE: u16 = 4096;
-impl FreelistAllocator {
-    const fn new() -> Self {
-        Self {
-            head: ListNode::new(0, 0),
-        }
-    }
-    fn alloc(&mut self) -> *mut u8 {
-        let mut node = ListNode::new(0, 0);
-        let node_ptr = node.as_ptr_mut();
-        unsafe {
-            self.head.next = Some(&mut *node_ptr);
-        }
-
-        null_mut()
-    }
-    fn free(&mut self) {}
-}
-static FREELIST_ALLOCATOR: SyncUnsafeCell<FreelistAllocator> =
-    SyncUnsafeCell::new(FreelistAllocator::new());
-static FREE_MEMORY_REGIONS: SyncUnsafeCell<[Region; 256]> =
-    SyncUnsafeCell::new([Region::new(0, 0); 256]);
-pub fn init_memory(entries: &[&Entry]) {
-    let mut lili = LinkedList::new(0u64);
-    lili.add(67);
-    lili.add(41);
-    lili.add(420);
-    let mut current = &lili.head;
-    loop {
-        if current.next.is_null() {
-            serial_println!("current is null");
-            //break;
-        }
-        let node = unsafe { &*current.next };
-        serial_println!("test while let");
-        serial_println!("val is: {}", node.item);
-        current = &node;
-    }
-    let frame_map = unsafe { &mut *FRAME_MAP.get() };
-    let free_memory_region = unsafe { &mut *FREE_MEMORY_REGIONS.get() };
-    for (i, entry) in entries.iter().enumerate() {
+unsafe impl Send for Region {}
+unsafe impl Sync for Region {}
+static REGION_HEAD: SyncUnsafeCell<Region> = SyncUnsafeCell::new(Region { next: null_mut() });
+pub fn init_memory(entries: &[&Entry], offset: u64) {
+    serial_println!("start of entry forloop");
+    for entry in entries {
         if entry.entry_type == EntryType::USABLE {
-            serial_println!("USABLE: base: {}, length: {}", entry.base, entry.length);
-            frame_map[i] = PageFrame::new(entry.base, entry.length);
-            let region = Region::new(entry.base, entry.length);
+            serial_println!("USABLE base: 0x{:x}, length: {}", entry.base, entry.length);
+            let mut current = REGION_HEAD.get();
+            let mut curr_size = 0u64;
+            while curr_size < entry.length {
+                let region = ((entry.base + curr_size) + offset) as *mut Region;
+                unsafe {
+                    if (*current).next.is_null() {
+                        (*current).next = region;
+                    }
+                    current = (*current).next;
+                    curr_size += PAGE_SIZE;
+                }
+            }
+
+            serial_println!("1");
         } else if entry.entry_type == EntryType::RESERVED {
-            serial_println!("RESERVED base: {}, length: {}", entry.base, entry.length);
+            serial_println!(
+                "RESERVED base: 0x{:x}, length: {}",
+                entry.base,
+                entry.length
+            );
+        }
+        serial_println!("2");
+    }
+    serial_println!("end of forloop entry");
+
+    serial_println!("starting printing data in the linked list");
+    unsafe {
+        let mut current = REGION_HEAD.get();
+        let mut count: usize = 0;
+        loop {
+            if (*current).next.is_null() {
+                break;
+            } else {
+                current = (*current).next;
+                count += 1;
+            }
+        }
+        serial_println!("we have count of: {}", count);
+    }
+    let a = allocate();
+    serial_println!("a is: {:p}", a);
+    free(a);
+    serial_println!("a gone?: {:p}", a);
+}
+
+pub fn allocate() -> *mut u8 {
+    let region_head = REGION_HEAD.get();
+    let mut current = region_head;
+    loop {
+        unsafe {
+            if (*current).next.is_null() {
+                break;
+            }
+            current = (*current).next;
         }
     }
-    //test()
+    current as *mut u8
 }
 
-fn test() {
-    let a = 0xdeadbeefu64 as *mut u8;
-    unsafe {
-        *a = 67;
-        serial_println!("{}", *a);
+pub fn free(addr: *mut u8) {
+    let region = addr as *mut Region;
+    let region_head = REGION_HEAD.get();
+    let mut current = region_head;
+    let mut previous = region_head;
+
+    loop {
+        unsafe {
+            if (*current).next.is_null() {
+                serial_println!("sad no more");
+                break;
+            }
+            if eq(current, region) {
+                serial_println!("ptr dies (sad)");
+                (*previous).next = null_mut();
+                break;
+            }
+            previous = current;
+            current = (*current).next;
+        }
     }
-}
-
-enum PageState {
-    Uninit,
-    Used,
-    Free,
-}
-struct Page {
-    state: PageState,
-}
-struct PageTable<'a> {
-    pages: &'a [Page],
 }

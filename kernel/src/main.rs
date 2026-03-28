@@ -12,7 +12,8 @@ use limine::BaseRevision;
 use limine::memory_map::EntryType;
 use limine::paging::Mode;
 use limine::request::{
-    FramebufferRequest, MemoryMapRequest, PagingModeRequest, RequestsEndMarker, RequestsStartMarker,
+    FramebufferRequest, HhdmRequest, MemoryMapRequest, PagingModeRequest, RequestsEndMarker,
+    RequestsStartMarker,
 };
 
 /// Sets the base revision to the latest revision supported by the crate.
@@ -34,6 +35,10 @@ static MEMORY_MAP_REQUEST: MemoryMapRequest = MemoryMapRequest::new();
 #[used]
 #[unsafe(link_section = ".requests")]
 static PAGING_MODE_REQUEST: PagingModeRequest = PagingModeRequest::new();
+
+#[used]
+#[unsafe(link_section = ".requests")]
+static HHDM_REQUEST: HhdmRequest = HhdmRequest::new();
 
 /// Define the stand and end markers for Limine requests.
 #[used]
@@ -69,24 +74,27 @@ unsafe extern "C" fn kmain() -> ! {
                 };
             }
         }
-        if let Some(memory_map_response) = MEMORY_MAP_REQUEST.get_response() {
+    }
+    if let Some(memory_map_response) = MEMORY_MAP_REQUEST.get_response() {
+        if let Some(hhdm_response) = HHDM_REQUEST.get_response() {
+            let offset = hhdm_response.offset();
             let entries = memory_map_response.entries();
-            init_memory(entries);
+            init_memory(entries, offset);
         }
-        if let Some(paging_mode_response) = PAGING_MODE_REQUEST.get_response() {
-            let mode = paging_mode_response.mode();
-            if mode == Mode::DEFAULT {
-                serial_println!("default paging");
-            }
-            if mode == Mode::FIVE_LEVEL {
-                serial_println!("five level paging");
-            }
-            if mode == Mode::FOUR_LEVEL {
-                serial_println!("four level paging");
-            }
-            if mode == Mode::MIN {
-                serial_println!("min paging paging")
-            }
+    }
+    if let Some(paging_mode_response) = PAGING_MODE_REQUEST.get_response() {
+        let mode = paging_mode_response.mode();
+        if mode == Mode::DEFAULT {
+            serial_println!("default paging");
+        }
+        if mode == Mode::FIVE_LEVEL {
+            serial_println!("five level paging");
+        }
+        if mode == Mode::FOUR_LEVEL {
+            serial_println!("four level paging");
+        }
+        if mode == Mode::MIN {
+            serial_println!("min paging paging")
         }
     }
     serial_println!("end");
