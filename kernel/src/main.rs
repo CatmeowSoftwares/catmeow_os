@@ -5,7 +5,7 @@ use core::arch::asm;
 
 use catmeow_os::gdt::init_gdt;
 use catmeow_os::idt::init_idt;
-use catmeow_os::memory::{self, init_memory};
+use catmeow_os::memory::pmm::init_memory;
 use catmeow_os::serial::init_serial;
 use catmeow_os::serial_println;
 use limine::BaseRevision;
