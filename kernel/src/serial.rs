@@ -1,4 +1,3 @@
-use crate::serial_println;
 use core::{arch::asm, fmt::Write};
 const PORT: u16 = 0x3F8;
 
@@ -33,7 +32,6 @@ pub fn init_serial() -> i32 {
         // (not-loopback with IRQs enabled and OUT#1 and OUT#2 bits enabled)
         outb(PORT + 4, 0x0F);
     }
-    serial_println!("Serial initialized! :3");
     0
 }
 pub unsafe fn inb(port: u16) -> u8 {
