@@ -9,15 +9,27 @@ struct Region {
 unsafe impl Send for Region {}
 unsafe impl Sync for Region {}
 static REGION_HEAD: SyncUnsafeCell<Region> = SyncUnsafeCell::new(Region { next: null_mut() });
-pub fn init_memory(entries: &[&Entry], offset: u64) {
+static HHDM_OFFSET: SyncUnsafeCell<u64> = SyncUnsafeCell::new(0);
+
+pub fn get_hhdm_offset() -> u64 {
+    unsafe { *HHDM_OFFSET.get() }
+}
+pub fn init_memory(entries: &[&Entry], hhdm_offset: u64) {
+    unsafe {
+        (*HHDM_OFFSET.get()) = hhdm_offset;
+        serial_println!("hhdm_offset: {}", (*HHDM_OFFSET.get()));
+    }
     let mut current = null_mut();
     for entry in entries {
         if entry.entry_type == EntryType::USABLE {
-            serial_println!("USABLE base: 0x{:x}, length: {}", entry.base, entry.length);
-
+            serial_println!(
+                "USABLE base: 0b{:064b}, length: {}",
+                entry.base,
+                entry.length
+            );
             let mut curr_size = 0u64;
             while curr_size < entry.length {
-                let region = ((entry.base + curr_size) + offset) as *mut Region;
+                let region = ((entry.base + curr_size) + hhdm_offset) as *mut Region;
                 unsafe {
                     (*region).next = current;
                     current = region;
@@ -45,7 +57,7 @@ pub fn allocate() -> *mut u8 {
         }
 
         (*head).next = (*node).next;
-        node as *mut u8
+        (node as u64 - *(HHDM_OFFSET.get())) as *mut u8
     }
 }
 
