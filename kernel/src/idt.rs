@@ -86,6 +86,8 @@ pub fn init_idt() {
             idt_set_descriptor(vector, exception_handler as *mut u8, 0x8e);
             vectors[vector as usize] = true;
         }
+        idt_set_descriptor(0x0E, page_fault_handler as *mut u8, 0x8e);
+
         lidt(idtr);
         enable_interrupts();
         serial_println!("IDT INITIALIZED");
@@ -106,4 +108,9 @@ fn lidt(idtr: &IDTR) {
     unsafe {
         asm!("lidt [{}]", in(reg) idtr, options(readonly, nostack, preserves_flags));
     }
+}
+
+fn page_fault_handler() {
+    serial_println!("page fault!");
+    loop {}
 }
