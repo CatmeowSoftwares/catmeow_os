@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(sync_unsafe_cell)]
+extern crate alloc;
 pub mod arch;
 pub mod gdt;
 pub mod idt;
