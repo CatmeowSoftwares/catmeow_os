@@ -44,15 +44,6 @@ impl IDTEntry {
     }
 }
 
-fn exception_handler() -> ! {
-    serial_println!("exception!");
-    loop {
-        unsafe {
-            asm!("hlt");
-        }
-    }
-}
-
 const GDT_OFFSET_KERNEL_CODE: u16 = 0x08;
 
 fn idt_set_descriptor(vector: u8, isr: *mut u8, flags: u8) {
@@ -67,31 +58,39 @@ fn idt_set_descriptor(vector: u8, isr: *mut u8, flags: u8) {
     descriptor.reserved = 0;
 }
 
-static VECTORS: SyncUnsafeCell<[bool; IDT_MAX_DESCRIPTORS]> =
-    SyncUnsafeCell::new([false; IDT_MAX_DESCRIPTORS]);
-
-static ISR_STUB_TABLE: SyncUnsafeCell<[u64; IDT_MAX_DESCRIPTORS]> =
-    SyncUnsafeCell::new([0u64; IDT_MAX_DESCRIPTORS]);
-
 pub fn init_idt() {
     let idtr = unsafe { &mut *IDTR.get() };
     let idt = unsafe { &mut *IDT.get() };
-    unsafe {
-        idtr.base = idt.as_ptr() as u64;
-        idtr.limit = (IDT_MAX_DESCRIPTORS * size_of::<IDTEntry>() - 1) as u16;
-        let isr_stub_table = &mut *ISR_STUB_TABLE.get();
-        let vectors = &mut *VECTORS.get();
-        for vector in 0..32 {
-            //idt_set_descriptor(vector, isr_stub_table[vector as usize] as *mut u8, 0x8e);
-            idt_set_descriptor(vector, exception_handler as *mut u8, 0x8e);
-            vectors[vector as usize] = true;
-        }
-        idt_set_descriptor(0x0E, page_fault_handler as *mut u8, 0x8e);
+    idtr.base = idt.as_ptr() as u64;
+    idtr.limit = (IDT_MAX_DESCRIPTORS * size_of::<IDTEntry>() - 1) as u16;
+    idt_set_descriptor(0, divide_error_handler as *mut u8, 0x8e);
+    idt_set_descriptor(1, debug_exception_handler as *mut u8, 0x8e);
+    idt_set_descriptor(2, nmi_interrupt_handler as *mut u8, 0x8e);
+    idt_set_descriptor(3, breakpoint_handler as *mut u8, 0x8e);
+    idt_set_descriptor(4, overflow_handler as *mut u8, 0x8e);
+    idt_set_descriptor(5, bound_range_exceeded_handler as *mut u8, 0x8e);
+    idt_set_descriptor(6, invalid_opcode_handler as *mut u8, 0x8e);
+    idt_set_descriptor(7, device_not_available_handler as *mut u8, 0x8e);
+    idt_set_descriptor(8, double_fault_handler as *mut u8, 0x8e);
+    idt_set_descriptor(9, coprocessor_segment_overrun_handler as *mut u8, 0x8e);
+    idt_set_descriptor(10, invalid_tss_handler as *mut u8, 0x8e);
+    idt_set_descriptor(11, segment_not_present_handler as *mut u8, 0x8e);
+    idt_set_descriptor(12, stack_segment_fault_handler as *mut u8, 0x8e);
+    idt_set_descriptor(13, general_protection_handler as *mut u8, 0x8e);
+    idt_set_descriptor(14, page_fault_handler as *mut u8, 0x8e);
+    idt_set_descriptor(16, x87_fpu_floating_point_error_handler as *mut u8, 0x8e);
+    idt_set_descriptor(17, alignment_check_handler as *mut u8, 0x8e);
+    idt_set_descriptor(18, machine_check_handler as *mut u8, 0x8e);
+    idt_set_descriptor(19, simd_floating_point_exception_handler as *mut u8, 0x8e);
+    idt_set_descriptor(20, virtualization_exception_handler as *mut u8, 0x8e);
+    idt_set_descriptor(21, control_protection_exception_handler as *mut u8, 0x8e);
+    idt_set_descriptor(28, hypervisor_injection_exception_handler as *mut u8, 0x8e);
+    idt_set_descriptor(29, vmm_communication_exception_handler as *mut u8, 0x8e);
+    idt_set_descriptor(30, security_exception_handler as *mut u8, 0x8e);
 
-        lidt(idtr);
-        enable_interrupts();
-        serial_println!("IDT INITIALIZED");
-    }
+    lidt(idtr);
+    enable_interrupts();
+    serial_println!("IDT INITIALIZED");
 }
 
 pub fn disable_interrupts() {
@@ -110,7 +109,80 @@ fn lidt(idtr: &IDTR) {
     }
 }
 
+fn divide_error_handler() {
+    panic!("divide error!");
+}
+fn debug_exception_handler() {
+    panic!("debug exception!");
+}
+
+fn nmi_interrupt_handler() {
+    panic!("nmi interrupt!");
+}
+fn breakpoint_handler() {
+    panic!("breakpoint!");
+}
+fn overflow_handler() {
+    panic!("overflow!");
+}
+fn bound_range_exceeded_handler() {
+    panic!("bound range exceeded!");
+}
+fn invalid_opcode_handler() {
+    panic!("invalid opcode!");
+}
+fn device_not_available_handler() {
+    panic!("device not available!");
+}
+fn double_fault_handler() {
+    panic!("double fault!");
+}
+fn coprocessor_segment_overrun_handler() {
+    panic!("coprocessor segment overrun!");
+}
+fn invalid_tss_handler() {
+    panic!("invalid tss!");
+}
+fn segment_not_present_handler() {
+    panic!("segment not present!");
+}
+
+fn stack_segment_fault_handler() {
+    panic!("stack segment fault!");
+}
+
+fn general_protection_handler() {
+    panic!("general protection!");
+}
+
 fn page_fault_handler() {
-    serial_println!("page fault!");
-    loop {}
+    panic!("page fault!");
+}
+
+fn x87_fpu_floating_point_error_handler() {
+    panic!("x87_fpu_floating_point_error!");
+}
+fn alignment_check_handler() {
+    panic!("alignment check!");
+}
+fn machine_check_handler() {
+    panic!("machine check!");
+}
+fn simd_floating_point_exception_handler() {
+    panic!("simd floating point exception!");
+}
+fn virtualization_exception_handler() {
+    panic!("virtualization exeption!");
+}
+fn control_protection_exception_handler() {
+    panic!("control_protection_exception!");
+}
+fn hypervisor_injection_exception_handler() {
+    panic!("hypervisor injection exception!");
+}
+fn vmm_communication_exception_handler() {
+    panic!("vmm communication exception!");
+}
+fn security_exception_handler() {
+    panic!("security exception!");
 }
