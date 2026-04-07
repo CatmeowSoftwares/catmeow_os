@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 bitfields = "1.0.3"
+flanterm = "0.0.2"
 limine = "0.5"
