@@ -17,7 +17,7 @@ impl Write for Terminal {
     }
 }
 static TERMINAL: SyncUnsafeCell<Terminal> = SyncUnsafeCell::new(Terminal { ctx: null_mut() });
-pub fn init_terminal(framebuffer: Framebuffer) {
+pub fn init_terminal(framebuffer: &Framebuffer) {
     {
         let terminal = unsafe { &mut *TERMINAL.get() };
         unsafe {
