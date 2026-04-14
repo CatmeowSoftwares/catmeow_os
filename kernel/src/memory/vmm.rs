@@ -224,12 +224,8 @@ pub fn unmap_page(virtaddr: *mut u8) {
     pt_entry.set_bits(0);
 
     unsafe {
-        asm!("unsafe {
-                asm!("
-                    invlpg [{0}]
-                    ",
-                    in(re
-            invlpg [{0}]
+        asm!("
+                invlpg [{0}]
             ",
             in(reg) virtaddr,
             options(nostack, preserves_flags)
