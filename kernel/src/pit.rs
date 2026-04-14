@@ -3,7 +3,7 @@ use core::sync::atomic::AtomicU32;
 use crate::{
     gui::put_line,
     idt::{disable_interrupts, enable_interrupts},
-    scheduler,
+    scheduler::{self, SCHEDULER},
     serial::{inb, outb},
     serial_println, terminal_print, terminal_println,
 };
@@ -54,7 +54,9 @@ pub(crate) unsafe extern "x86-interrupt" fn timer_interrupt_handler(
     unsafe {
         outb(0x20, 0x20);
     }
-    let (prev, next) = scheduler::schedule();
+    unsafe { SCHEDULER.force_unlock() };
+    let mut scheduler = SCHEDULER.lock();
+    scheduler.schedule();
 }
 pub fn get_ms() -> u32 {
     MS_TICK.load(core::sync::atomic::Ordering::Relaxed)
