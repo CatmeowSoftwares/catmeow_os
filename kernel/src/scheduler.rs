@@ -28,6 +28,111 @@ impl Scheduler {
             next: None,
         }
     }
+    pub fn schedule(&mut self) {
+        if self.current.is_none() {
+            self.current = Some(self.head);
+        } else {
+            if let Some(current) = self.current {
+                if let Some(next) = unsafe { (*current).next.as_ref() } {
+                    unsafe { switch(&*current, next) };
+                    unsafe { terminal_println!("current: {}, next: {}", (*current).id, next.id) };
+                }
+            }
+        }
+    }
+}
+#[unsafe(naked)]
+pub unsafe extern "C" fn switch(current: &ThreadControlBlock, next: &ThreadControlBlock) {
+    core::arch::naked_asm!(
+        "
+        push rax
+        push rbx
+        push rcx
+        push rdx
+        push rsi
+        push rdi
+        push rsp
+        push rbp
+        push r8
+        push r9
+        push r10
+        push r11
+        push r12
+        push r13
+        push r14
+        push r15
+
+        mov [rdi + {rax_offset}], rax
+        mov [rdi + {rbx_offset}], rbx
+        mov [rdi + {rcx_offset}], rcx
+        mov [rdi + {rdx_offset}], rdx
+        mov [rdi + {rsi_offset}], rsi
+        mov [rdi + {rdi_offset}], rdi
+        mov [rdi + {rsp_offset}], rsp
+        mov [rdi + {rbp_offset}], rbp
+        mov [rdi + {r8_offset}], r8
+        mov [rdi + {r9_offset}], r9
+        mov [rdi + {r10_offset}], r10
+        mov [rdi + {r11_offset}], r11
+        mov [rdi + {r12_offset}], r12
+        mov [rdi + {r13_offset}], r13
+        mov [rdi + {r14_offset}], r14
+        mov [rdi + {r15_offset}], r15
+
+
+
+        mov rax, [rsi + {rsp_offset}]
+        mov rbx, [rsi + {rsp_offset}]
+        mov rcx, [rsi + {rsp_offset}]
+        mov rdx, [rsi + {rsp_offset}]
+        mov rdi, [rsi + {rsp_offset}]
+        mov rsp, [rsi + {rsp_offset}]
+        mov rbp, [rsi + {rsp_offset}]
+        mov r8, [rsi + {rsp_offset}]
+        mov r9, [rsi + {rsp_offset}]
+        mov r10, [rsi + {rsp_offset}]
+        mov r11, [rsi + {rsp_offset}]
+        mov r12, [rsi + {rsp_offset}]
+        mov r13, [rsi + {rsp_offset}]
+        mov r14, [rsi + {rsp_offset}]
+        mov r15, [rsi + {rsp_offset}]
+        mov rdi, [rsi + {rsp_offset}]
+
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop r11
+        pop r10
+        pop r9
+        pop r8
+        pop rbp
+        pop rsp
+        pop rdi
+        pop rsi
+        pop rdx
+        pop rcx
+        pop rbx
+        pop rax
+        ret
+        ",
+        rax_offset = const offset_of!(Registers, rax),
+        rbx_offset = const offset_of!(Registers, rbx),
+        rcx_offset = const offset_of!(Registers, rcx),
+        rdx_offset = const offset_of!(Registers, rdx),
+        rsi_offset = const offset_of!(Registers, rsi),
+        rdi_offset = const offset_of!(Registers, rdi),
+        rsp_offset = const offset_of!(Registers, rsp),
+        rbp_offset = const offset_of!(Registers, rbp),
+        r8_offset = const offset_of!(Registers, r8),
+        r9_offset = const offset_of!(Registers, r9),
+        r10_offset = const offset_of!(Registers, r10),
+        r11_offset = const offset_of!(Registers, r11),
+        r12_offset = const offset_of!(Registers, r12),
+        r13_offset = const offset_of!(Registers, r13),
+        r14_offset = const offset_of!(Registers, r14),
+        r15_offset = const offset_of!(Registers, r15),
+    )
 }
 static CURRENT_COUNT: AtomicU64 = AtomicU64::new(0);
 static LAST_COUNT: AtomicU64 = AtomicU64::new(0);
@@ -36,17 +141,6 @@ pub fn init_scheduler() {
     for i in 0..10 {
         let node = Box::into_raw(Box::new(ThreadControlBlock::new(i as u64)));
         add_process(node);
-    }
-    let scheduler = SCHEDULER.try_lock();
-    if let Some(scheduler) = scheduler {
-        if let Some(current) = scheduler.current {
-            unsafe {
-                terminal_println!("current pid: {}", (*current).id);
-                if let Some(next) = (*current).next.as_mut() {
-                    terminal_println!("next PID: {}", next.id);
-                }
-            }
-        }
     }
 }
 
