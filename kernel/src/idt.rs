@@ -1,7 +1,8 @@
 use core::arch::asm;
-use core::cell::SyncUnsafeCell;
 
-use crate::serial_println;
+use spin::Mutex;
+
+use crate::{serial_println, terminal_println};
 #[repr(C, packed)]
 struct IDTR {
     limit: u16,
@@ -12,11 +13,11 @@ impl IDTR {
         Self { limit: 0, base: 0 }
     }
 }
-static IDTR: SyncUnsafeCell<IDTR> = SyncUnsafeCell::new(IDTR::new());
+static IDTR: Mutex<IDTR> = Mutex::new(IDTR::new());
 
 const IDT_MAX_DESCRIPTORS: usize = 256;
-static IDT: SyncUnsafeCell<[IDTEntry; IDT_MAX_DESCRIPTORS]> =
-    SyncUnsafeCell::new([IDTEntry::new(); IDT_MAX_DESCRIPTORS]);
+static IDT: Mutex<[IDTEntry; IDT_MAX_DESCRIPTORS]> =
+    Mutex::new([IDTEntry::new(); IDT_MAX_DESCRIPTORS]);
 
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
@@ -46,8 +47,18 @@ impl IDTEntry {
 
 const GDT_OFFSET_KERNEL_CODE: u16 = 0x08;
 
+#[derive(Debug)]
+#[repr(C)]
+pub(crate) struct InterruptStackFrame {
+    ip: usize,
+    cs: usize,
+    flags: usize,
+    sp: usize,
+    ss: usize,
+}
+
 fn idt_set_descriptor(vector: u8, isr: *mut u8, flags: u8) {
-    let idt = unsafe { &mut *IDT.get() };
+    let mut idt = IDT.lock();
     let descriptor = &mut idt[vector as usize];
     descriptor.isr_low = isr as u16 & 0xffff;
     descriptor.kernel_cs = GDT_OFFSET_KERNEL_CODE;
@@ -59,10 +70,16 @@ fn idt_set_descriptor(vector: u8, isr: *mut u8, flags: u8) {
 }
 
 pub fn init_idt() {
-    let idtr = unsafe { &mut *IDTR.get() };
-    let idt = unsafe { &mut *IDT.get() };
-    idtr.base = idt.as_ptr() as u64;
-    idtr.limit = (IDT_MAX_DESCRIPTORS * size_of::<IDTEntry>() - 1) as u16;
+    {
+        let mut idtr = IDTR.lock();
+        let idt = IDT.lock();
+        idtr.base = idt.as_ptr() as u64;
+        idtr.limit = (IDT_MAX_DESCRIPTORS * size_of::<IDTEntry>() - 1) as u16;
+    }
+    for i in 0..IDT_MAX_DESCRIPTORS {
+        idt_set_descriptor(i as u8, exception_handler as *mut u8, 0x8e);
+    }
+    idt_set_descriptor(0x20, crate::pit::timer_interrupt_handler as *mut u8, 0x8e);
     idt_set_descriptor(0, divide_error_handler as *mut u8, 0x8e);
     idt_set_descriptor(1, debug_exception_handler as *mut u8, 0x8e);
     idt_set_descriptor(2, nmi_interrupt_handler as *mut u8, 0x8e);
@@ -88,9 +105,9 @@ pub fn init_idt() {
     idt_set_descriptor(29, vmm_communication_exception_handler as *mut u8, 0x8e);
     idt_set_descriptor(30, security_exception_handler as *mut u8, 0x8e);
 
-    lidt(idtr);
+    let idtr = IDTR.lock();
+    lidt(&*idtr);
     enable_interrupts();
-    serial_println!("IDT INITIALIZED");
 }
 
 pub fn disable_interrupts() {
@@ -109,80 +126,98 @@ fn lidt(idtr: &IDTR) {
     }
 }
 
-fn divide_error_handler() {
-    panic!("divide error!");
-}
-fn debug_exception_handler() {
-    panic!("debug exception!");
+unsafe extern "x86-interrupt" fn exception_handler(stack_frame: InterruptStackFrame) {
+    panic!("exception!: {:#x?}", stack_frame);
 }
 
-fn nmi_interrupt_handler() {
-    panic!("nmi interrupt!");
+unsafe extern "x86-interrupt" fn divide_error_handler(stack_frame: InterruptStackFrame) {
+    panic!("divide error: {:#x?}", stack_frame);
 }
-fn breakpoint_handler() {
-    panic!("breakpoint!");
-}
-fn overflow_handler() {
-    panic!("overflow!");
-}
-fn bound_range_exceeded_handler() {
-    panic!("bound range exceeded!");
-}
-fn invalid_opcode_handler() {
-    panic!("invalid opcode!");
-}
-fn device_not_available_handler() {
-    panic!("device not available!");
-}
-fn double_fault_handler() {
-    panic!("double fault!");
-}
-fn coprocessor_segment_overrun_handler() {
-    panic!("coprocessor segment overrun!");
-}
-fn invalid_tss_handler() {
-    panic!("invalid tss!");
-}
-fn segment_not_present_handler() {
-    panic!("segment not present!");
+unsafe extern "x86-interrupt" fn debug_exception_handler(stack_frame: InterruptStackFrame) {
+    panic!("debug exception: {:#x?}", stack_frame);
 }
 
-fn stack_segment_fault_handler() {
-    panic!("stack segment fault!");
+unsafe extern "x86-interrupt" fn nmi_interrupt_handler(stack_frame: InterruptStackFrame) {
+    panic!("nmi interrupt: {:#x?}", stack_frame);
+}
+unsafe extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
+    panic!("breakpoint: {:#x?}", stack_frame);
+}
+unsafe extern "x86-interrupt" fn overflow_handler(stack_frame: InterruptStackFrame) {
+    panic!("overflow: {:#x?}", stack_frame);
+}
+unsafe extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: InterruptStackFrame) {
+    panic!("bound range exceeded: {:#x?}", stack_frame);
+}
+unsafe extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFrame) {
+    panic!("invalid opcode: {:#x?}", stack_frame);
+}
+unsafe extern "x86-interrupt" fn device_not_available_handler(stack_frame: InterruptStackFrame) {
+    panic!("device not available: {:#x?}", stack_frame);
+}
+unsafe extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame) {
+    panic!("double fault: {:#x?}", stack_frame);
+}
+unsafe extern "x86-interrupt" fn coprocessor_segment_overrun_handler(
+    stack_frame: InterruptStackFrame,
+) {
+    panic!("coprocessor segment overrun: {:#x?}", stack_frame);
+}
+unsafe extern "x86-interrupt" fn invalid_tss_handler(stack_frame: InterruptStackFrame) {
+    panic!("invalid tss: {:#x?}", stack_frame);
+}
+unsafe extern "x86-interrupt" fn segment_not_present_handler(stack_frame: InterruptStackFrame) {
+    panic!("segment not present: {:#x?}", stack_frame);
 }
 
-fn general_protection_handler() {
-    panic!("general protection!");
+unsafe extern "x86-interrupt" fn stack_segment_fault_handler(stack_frame: InterruptStackFrame) {
+    panic!("stack segment fault: {:#x?}", stack_frame);
 }
 
-fn page_fault_handler() {
-    panic!("page fault!");
+unsafe extern "x86-interrupt" fn general_protection_handler(stack_frame: InterruptStackFrame) {
+    panic!("general protection: {:#x?}", stack_frame);
 }
 
-fn x87_fpu_floating_point_error_handler() {
-    panic!("x87_fpu_floating_point_error!");
+unsafe extern "x86-interrupt" fn page_fault_handler(stack_frame: InterruptStackFrame) {
+    panic!("page fault: {:#x?}", stack_frame);
 }
-fn alignment_check_handler() {
-    panic!("alignment check!");
+
+unsafe extern "x86-interrupt" fn x87_fpu_floating_point_error_handler(
+    stack_frame: InterruptStackFrame,
+) {
+    panic!("x87_fpu_floating_point_error: {:#x?}", stack_frame);
 }
-fn machine_check_handler() {
-    panic!("machine check!");
+unsafe extern "x86-interrupt" fn alignment_check_handler(stack_frame: InterruptStackFrame) {
+    panic!("alignment check: {:#x?}", stack_frame);
 }
-fn simd_floating_point_exception_handler() {
-    panic!("simd floating point exception!");
+unsafe extern "x86-interrupt" fn machine_check_handler(stack_frame: InterruptStackFrame) {
+    panic!("machine check: {:#x?}", stack_frame);
 }
-fn virtualization_exception_handler() {
-    panic!("virtualization exeption!");
+unsafe extern "x86-interrupt" fn simd_floating_point_exception_handler(
+    stack_frame: InterruptStackFrame,
+) {
+    panic!("simd floating point exception: {:#x?}", stack_frame);
 }
-fn control_protection_exception_handler() {
-    panic!("control_protection_exception!");
+unsafe extern "x86-interrupt" fn virtualization_exception_handler(
+    stack_frame: InterruptStackFrame,
+) {
+    panic!("virtualization exeption: {:#x?}", stack_frame);
 }
-fn hypervisor_injection_exception_handler() {
-    panic!("hypervisor injection exception!");
+unsafe extern "x86-interrupt" fn control_protection_exception_handler(
+    stack_frame: InterruptStackFrame,
+) {
+    panic!("control_protection_exception: {:#x?}", stack_frame);
 }
-fn vmm_communication_exception_handler() {
-    panic!("vmm communication exception!");
+unsafe extern "x86-interrupt" fn hypervisor_injection_exception_handler(
+    stack_frame: InterruptStackFrame,
+) {
+    panic!("hypervisor injection exception: {:#x?}", stack_frame);
 }
-fn security_exception_handler() {
-    panic!("security exception!");
+unsafe extern "x86-interrupt" fn vmm_communication_exception_handler(
+    stack_frame: InterruptStackFrame,
+) {
+    panic!("vmm communication exception: {:#x?}", stack_frame);
+}
+unsafe extern "x86-interrupt" fn security_exception_handler(stack_frame: InterruptStackFrame) {
+    panic!("security exception: {:#x?}", stack_frame);
 }

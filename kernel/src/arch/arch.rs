@@ -1,5 +1,9 @@
 use core::arch::asm;
-
+pub fn loop_halt() {
+    loop {
+        hlt();
+    }
+}
 pub fn halt() {
     hlt()
 }

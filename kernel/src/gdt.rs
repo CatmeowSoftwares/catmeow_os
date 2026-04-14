@@ -1,9 +1,8 @@
-use core::{
-    arch::{asm, global_asm},
-    cell::SyncUnsafeCell,
-};
+use core::arch::{asm, global_asm};
 
-use crate::serial_println;
+use spin::Mutex;
+
+use crate::terminal_println;
 const GDTBASE: u64 = 0x00000800;
 
 const fn seg_desktype(x: u16) -> u16 {
@@ -95,24 +94,23 @@ impl GlobalDescriptorTableRegister {
     }
 }
 
-static GDTR: SyncUnsafeCell<GlobalDescriptorTableRegister> =
-    SyncUnsafeCell::new(GlobalDescriptorTableRegister::new());
-static GDT: SyncUnsafeCell<[u64; 6]> = SyncUnsafeCell::new([0u64; 6]);
+static GDTR: Mutex<GlobalDescriptorTableRegister> =
+    Mutex::new(GlobalDescriptorTableRegister::new());
+static GDT: Mutex<[u64; 6]> = Mutex::new([0u64; 6]);
 
 pub fn init_gdt() {
-    let gdt = unsafe { &mut *GDT.get() };
+    let mut gdt = GDT.lock();
     gdt[0] = create_descriptor(0, 0, 0);
     gdt[1] = create_descriptor(0, 0x000FFFFF, GDT_CODE_PL0);
     gdt[2] = create_descriptor(0, 0x000FFFFF, GDT_DATA_PL0);
     gdt[3] = create_descriptor(0, 0x000FFFFF, GDT_CODE_PL3);
     gdt[4] = create_descriptor(0, 0x000FFFFF, GDT_DATA_PL3);
 
-    let gdtr = unsafe { &mut *GDTR.get() };
-    gdtr.limit = (size_of_val(gdt) - 1) as u16;
+    let mut gdtr = GDTR.lock();
+    gdtr.limit = (size_of_val(&*gdt) - 1) as u16;
     gdtr.base = gdt.as_ptr() as u64;
-    lgdt(gdtr);
+    lgdt(&*gdtr);
     reload_segments();
-    serial_println!("GDT INITIALIZED")
 }
 
 fn reload_segments() {
@@ -152,6 +150,6 @@ pub fn create_descriptor(base: u32, limit: u32, flag: u16) -> u64 {
     descriptor |= (base << 16) as u64;
     descriptor |= (limit & 0x0000FFFF) as u64;
 
-    //serial_println!("0x{:016x}", descriptor);
+    //terminal_println!("0x{:016x}", descriptor);
     descriptor
 }

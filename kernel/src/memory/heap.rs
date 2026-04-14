@@ -1,12 +1,13 @@
 use core::{
     alloc::{GlobalAlloc, Layout},
-    cell::SyncUnsafeCell,
     ptr::null_mut,
 };
 
+use spin::{Mutex, MutexGuard};
+
 use crate::{
     memory::{pmm, vmm},
-    serial_println,
+    terminal_println,
 };
 const HEAP_START: usize = 0xFFFF_8000_0000_0000;
 const HEAP_SIZE: usize = 4 * 1024 * 1024;
@@ -84,10 +85,10 @@ impl Allocator {
     }
 }
 
-unsafe impl GlobalAlloc for MySyncUnsafeCellAllocator {
+unsafe impl GlobalAlloc for MyAllocator {
     unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
         let (size, align) = Allocator::size_align(layout);
-        let allocator = self.get_mut();
+        let mut allocator = self.lock();
         if let Some((region, start)) = allocator.find(size, align) {
             let alloc_end = start.checked_add(size).expect("overflow");
             let excess = region.get_end() - alloc_end;
@@ -100,36 +101,36 @@ unsafe impl GlobalAlloc for MySyncUnsafeCellAllocator {
         }
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
-        let allocator = self.get_mut();
+        let mut allocator = self.lock();
         let (size, _) = Allocator::size_align(layout);
         allocator.add(ptr as usize, size);
     }
 }
 
 #[global_allocator]
-static ALLOCATOR: MySyncUnsafeCellAllocator = MySyncUnsafeCellAllocator::new();
+static ALLOCATOR: MyAllocator = MyAllocator::new();
 
-struct MySyncUnsafeCellAllocator {
-    inner: SyncUnsafeCell<Allocator>,
+struct MyAllocator {
+    inner: Mutex<Allocator>,
 }
 
-impl MySyncUnsafeCellAllocator {
+impl MyAllocator {
     const fn new() -> Self {
         Self {
-            inner: SyncUnsafeCell::new(Allocator::new()),
+            inner: Mutex::new(Allocator::new()),
         }
     }
 
-    fn get_mut(&self) -> &mut Allocator {
-        unsafe { &mut *self.inner.get() }
+    fn lock(&self) -> MutexGuard<'_, Allocator> {
+        self.inner.lock()
     }
 }
 
 pub fn init_heap() {
-    serial_println!("heap init start");
+    terminal_println!("heap init start");
     vmm::allocate(HEAP_START as u64, HEAP_SIZE, 3);
-    serial_println!("heap allocate done");
-    let allocator = ALLOCATOR.get_mut();
+    terminal_println!("heap allocate done");
+    let mut allocator = ALLOCATOR.lock();
     allocator.add(HEAP_START, HEAP_SIZE);
-    serial_println!("heap init good");
+    terminal_println!("heap init good");
 }

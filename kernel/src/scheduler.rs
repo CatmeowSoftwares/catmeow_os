@@ -1,28 +1,29 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
+use spin::Mutex;
 
 use crate::{
     gui::{put_pixel, put_rect},
     process::{Process, ProcessControlBlock},
     serial_println, terminal_println,
+    thread::ThreadControlBlock,
     tsc::get_ms,
 };
-use core::{cell::SyncUnsafeCell, mem::offset_of, ptr::null_mut, sync::atomic::AtomicU64};
-static PROCESS_HEAD: SyncUnsafeCell<Process> = SyncUnsafeCell::new(Process { next: null_mut() });
+use core::{mem::offset_of, ptr::null_mut, sync::atomic::AtomicU64};
 
-static SCHEDULER: SyncUnsafeCell<Scheduler> = SyncUnsafeCell::new(Scheduler::new());
+pub static SCHEDULER: Mutex<Scheduler> = Mutex::new(Scheduler::new());
+unsafe impl Send for Scheduler {}
 unsafe impl Sync for Scheduler {}
-struct Scheduler {
-    head: ProcessControlBlock,
-    tail: Option<*mut ProcessControlBlock>,
-    current: Option<&'static mut ProcessControlBlock>,
-    next: Option<&'static mut ProcessControlBlock>,
+pub struct Scheduler {
+    head: *mut ThreadControlBlock,
+    tail: Option<*mut ThreadControlBlock>,
+    pub(crate) current: Option<*mut ThreadControlBlock>,
+    next: Option<*mut ThreadControlBlock>,
 }
-
 impl Scheduler {
     const fn new() -> Self {
         Self {
             tail: None,
-            head: ProcessControlBlock::new(0),
+            head: null_mut(),
             current: None,
             next: None,
         }
@@ -32,63 +33,66 @@ static CURRENT_COUNT: AtomicU64 = AtomicU64::new(0);
 static LAST_COUNT: AtomicU64 = AtomicU64::new(0);
 pub fn init_multitasking() {}
 pub fn init_scheduler() {
-    let scheduler = unsafe { &mut *SCHEDULER.get() };
     for i in 0..10 {
-        let node = Box::into_raw(Box::new(ProcessControlBlock::new(i as u64)));
+        let node = Box::into_raw(Box::new(ThreadControlBlock::new(i as u64)));
         add_process(node);
     }
-    let time_to_wait = 1000; //seconds
-    let mut current_time;
-    let mut last_schedule_time = 0;
-    let register = Registers::default();
-    serial_println!("offset of! {}", offset_of!(Registers, rax));
-    serial_println!("offset of! {}", offset_of!(Registers, rbx));
-    serial_println!("offset of! {}", offset_of!(Registers, cr3));
-    loop {
-        put_rect(21, 21, 500, 500, 0xFF00FF);
-        current_time = get_ms();
-        //serial_println!("current time: {}", current_time);
-        if current_time - last_schedule_time >= time_to_wait {
-            last_schedule_time = current_time;
-            schedule();
-        }
-    }
-}
-
-fn schedule() {
-    let scheduler = unsafe { &mut *SCHEDULER.get() };
-    if scheduler.current.is_none() {
-        scheduler.current = unsafe { scheduler.head.next.as_mut() };
-    } else {
-        let next_ptr = scheduler.current.as_ref().map(|c| c.next);
-        if let Some(ptr) = next_ptr {
+    let scheduler = SCHEDULER.try_lock();
+    if let Some(scheduler) = scheduler {
+        if let Some(current) = scheduler.current {
             unsafe {
-                scheduler.current = ptr.as_mut();
+                terminal_println!("current pid: {}", (*current).id);
+                if let Some(next) = (*current).next.as_mut() {
+                    terminal_println!("next PID: {}", next.id);
+                }
             }
         }
     }
-    if let Some(ref current) = scheduler.current {
-        terminal_println!("current PID: {}", current.id);
-        if let Some(next) = unsafe { current.next.as_mut() } {
-            terminal_println!("next PID: {}", next.id);
+}
+
+pub(crate) fn schedule() -> (*mut ThreadControlBlock, *mut ThreadControlBlock) {
+    unsafe { SCHEDULER.force_unlock() };
+    let scheduler = SCHEDULER.try_lock();
+    match scheduler {
+        Some(mut scheduler) => {
+            if scheduler.current.is_none() {
+                scheduler.current = Some(scheduler.head);
+            } else {
+                if let Some(current) = scheduler.current {
+                    unsafe { scheduler.current = Some((*current).next) };
+                }
+            }
+            let current = scheduler.current;
+
+            if let Some(current) = current {
+                if let Some(next) = scheduler.current {
+                    (current, next)
+                } else {
+                    (null_mut(), null_mut())
+                }
+            } else {
+                (null_mut(), null_mut())
+            }
         }
+        None => (null_mut(), null_mut()),
     }
 }
 
-fn add_process(node: *mut ProcessControlBlock) {
-    let scheduler = unsafe { &mut *SCHEDULER.get() };
+fn add_process(node: *mut ThreadControlBlock) {
+    let mut scheduler = SCHEDULER.lock();
 
-    if scheduler.head.next.is_null() {
+    if scheduler.head.is_null() {
+        scheduler.head = node;
         unsafe {
-            (*node).next = &raw mut scheduler.head;
+            (*node).next = scheduler.head;
         }
-        scheduler.head.next = node;
+        scheduler.head = node;
         scheduler.tail = Some(node);
     } else {
         unsafe {
             let old_tail = scheduler.tail.unwrap();
             (*old_tail).next = node;
-            (*node).next = &raw mut scheduler.head;
+            (*node).next = scheduler.head;
             scheduler.tail = Some(node);
         }
     }
@@ -102,36 +106,115 @@ fn context_switch() {
     }
 }
 
-#[derive(Default)]
-struct Registers {
-    rax: u64,
-    rbx: u64,
-    rcx: u64,
-    rdx: u64,
-    rsi: u64,
-    rdi: u64,
-    rsp: u64,
-    rbp: u64,
-    r8: u64,
-    r9: u64,
-    r10: u64,
-    r11: u64,
-    r12: u64,
-    r13: u64,
-    r14: u64,
-    r15: u64,
-    cr3: u64,
+#[derive(Default, Clone, Copy)]
+pub struct Registers {
+    pub rax: u64,
+    pub rbx: u64,
+    pub rcx: u64,
+    pub rdx: u64,
+    pub rsi: u64,
+    pub rdi: u64,
+    pub rsp: u64,
+    pub rbp: u64,
+    pub rip: u64,
+    pub r8: u64,
+    pub r9: u64,
+    pub r10: u64,
+    pub r11: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
 }
 impl Registers {
     fn new() -> Self {
         Self::default()
     }
 }
+
 #[unsafe(naked)]
-pub unsafe extern "C" fn test(register: &Registers) {
-    core::arch::naked_asm!("");
+pub unsafe extern "C" fn apply_registers(register: &Registers) {
+    core::arch::naked_asm!(
+        r#"
+        mov rax, [rdi + {rax_offset}]
+        mov rbx, [rdi + {rbx_offset}]
+        mov rcx, [rdi + {rcx_offset}]
+        mov rdx, [rdi + {rdx_offset}]
+        mov rsi, [rdi + {rsi_offset}]
+        mov rsp, [rdi + {rsp_offset}]
+        mov rbp, [rdi + {rbp_offset}]
+        mov r8, [rdi + {r8_offset}]
+        mov r9, [rdi + {r9_offset}]
+        mov r10, [rdi + {r10_offset}]
+        mov r11, [rdi + {r11_offset}]
+        mov r12, [rdi + {r12_offset}]
+        mov r13, [rdi + {r13_offset}]
+        mov r14, [rdi + {r14_offset}]
+        mov r15, [rdi + {r15_offset}]
+        mov rdi, [rdi + {rdi_offset}]
+        iretq
+        "#,
+        rax_offset = const offset_of!(Registers, rax),
+        rbx_offset = const offset_of!(Registers, rbx),
+        rcx_offset = const offset_of!(Registers, rcx),
+        rdx_offset = const offset_of!(Registers, rdx),
+        rsi_offset = const offset_of!(Registers, rsi),
+        rdi_offset = const offset_of!(Registers, rdi),
+        rsp_offset = const offset_of!(Registers, rsp),
+        rbp_offset = const offset_of!(Registers, rbp),
+        r8_offset = const offset_of!(Registers, r8),
+        r9_offset = const offset_of!(Registers, r9),
+        r10_offset = const offset_of!(Registers, r10),
+        r11_offset = const offset_of!(Registers, r11),
+        r12_offset = const offset_of!(Registers, r12),
+        r13_offset = const offset_of!(Registers, r13),
+        r14_offset = const offset_of!(Registers, r14),
+        r15_offset = const offset_of!(Registers, r15),
+    );
+}
+
+#[unsafe(naked)]
+pub unsafe extern "C" fn save_registers(register: &mut Registers) {
+    core::arch::naked_asm!(
+        r#"
+        mov [rdi + {rax_offset}], rax
+        mov [rdi + {rbx_offset}], rbx
+        mov [rdi + {rcx_offset}], rcx
+        mov [rdi + {rdx_offset}], rdx
+        mov [rdi + {rsi_offset}], rsi
+        mov [rdi + {rsp_offset}], rsp
+        mov [rdi + {rbp_offset}], rbp
+        mov [rdi + {r8_offset}], r8
+        mov [rdi + {r9_offset}], r9
+        mov [rdi + {r10_offset}], r10
+        mov [rdi + {r11_offset}], r11
+        mov [rdi + {r12_offset}], r12
+        mov [rdi + {r13_offset}], r13
+        mov [rdi + {r14_offset}], r14
+        mov [rdi + {r15_offset}], r15
+        mov [rdi + {rdi_offset}], rdi
+        ret
+        "#,
+        rax_offset = const offset_of!(Registers, rax),
+        rbx_offset = const offset_of!(Registers, rbx),
+        rcx_offset = const offset_of!(Registers, rcx),
+        rdx_offset = const offset_of!(Registers, rdx),
+        rsi_offset = const offset_of!(Registers, rsi),
+        rdi_offset = const offset_of!(Registers, rdi),
+        rsp_offset = const offset_of!(Registers, rsp),
+        rbp_offset = const offset_of!(Registers, rbp),
+        r8_offset = const offset_of!(Registers, r8),
+        r9_offset = const offset_of!(Registers, r9),
+        r10_offset = const offset_of!(Registers, r10),
+        r11_offset = const offset_of!(Registers, r11),
+        r12_offset = const offset_of!(Registers, r12),
+        r13_offset = const offset_of!(Registers, r13),
+        r14_offset = const offset_of!(Registers, r14),
+        r15_offset = const offset_of!(Registers, r15),
+    );
 }
 fn save_current_regs() -> Registers {
     let mut register = Registers::new();
     register
 }
+fn load_bin(data: &[u8]) {}

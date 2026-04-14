@@ -1,7 +1,9 @@
-use core::{cell::SyncUnsafeCell, sync::atomic::AtomicU32};
+use core::sync::atomic::AtomicU32;
 
 use crate::{
+    gui::put_line,
     idt::{disable_interrupts, enable_interrupts},
+    scheduler,
     serial::{inb, outb},
     serial_println, terminal_print, terminal_println,
 };
@@ -36,13 +38,11 @@ pub fn init_pit() {
     let divisor = (PIT_FREQUENCY / 1000) as u16;
     set_pit_count(divisor);
     enable_interrupts();
-    serial_println!("saaasasas");
 }
 static MS_TICK: AtomicU32 = AtomicU32::new(0);
 pub(crate) unsafe extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: crate::idt::InterruptStackFrame,
 ) {
-    //serial_println!("test");
     MS_TICK.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
     COUNT_DOWN
         .try_update(
@@ -54,6 +54,7 @@ pub(crate) unsafe extern "x86-interrupt" fn timer_interrupt_handler(
     unsafe {
         outb(0x20, 0x20);
     }
+    let (prev, next) = scheduler::schedule();
 }
 pub fn get_ms() -> u32 {
     MS_TICK.load(core::sync::atomic::Ordering::Relaxed)

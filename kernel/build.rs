@@ -4,4 +4,5 @@ fn main() {
     println!("cargo:rustc-link-arg=-Tlinker-{arch}.ld");
     // ..and to re-run if it changes.
     println!("cargo:rerun-if-changed=linker-{arch}.ld");
+    println!("cargo:rustc-link-search=uACPI");
 }

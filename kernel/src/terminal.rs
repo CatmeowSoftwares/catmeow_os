@@ -1,7 +1,8 @@
 use crate::terminal_println;
-use core::{cell::SyncUnsafeCell, ffi::c_char, fmt::Write, ptr::null_mut};
+use core::{ffi::c_char, fmt::Write, ptr::null_mut};
 use flanterm::sys::flanterm_context;
 use limine::framebuffer::Framebuffer;
+use spin::Mutex;
 struct Terminal {
     ctx: *mut flanterm_context,
 }
@@ -16,10 +17,10 @@ impl Write for Terminal {
         Ok(())
     }
 }
-static TERMINAL: SyncUnsafeCell<Terminal> = SyncUnsafeCell::new(Terminal { ctx: null_mut() });
+static TERMINAL: Mutex<Terminal> = Mutex::new(Terminal { ctx: null_mut() });
 pub fn init_terminal(framebuffer: &Framebuffer) {
     {
-        let terminal = unsafe { &mut *TERMINAL.get() };
+        let mut terminal = TERMINAL.lock();
         unsafe {
             terminal.ctx = flanterm::sys::flanterm_fb_init(
                 None,
@@ -56,7 +57,7 @@ pub fn init_terminal(framebuffer: &Framebuffer) {
 
 #[doc(hidden)]
 pub fn _print(args: ::core::fmt::Arguments) {
-    let terminal = unsafe { &mut *TERMINAL.get() };
+    let mut terminal = TERMINAL.lock();
     terminal
         .write_fmt(args)
         .expect("failed to write in terminal");
