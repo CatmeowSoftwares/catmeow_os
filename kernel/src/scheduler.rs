@@ -3,6 +3,7 @@ use spin::Mutex;
 
 use crate::{
     gui::{put_pixel, put_rect},
+    idt::{disable_interrupts, enable_interrupts},
     process::{Process, ProcessControlBlock},
     serial_println, terminal_println,
     thread::ThreadControlBlock,
@@ -33,9 +34,12 @@ impl Scheduler {
             self.current = Some(self.head);
         } else {
             if let Some(current) = self.current {
-                if let Some(next) = unsafe { (*current).next.as_ref() } {
-                    unsafe { switch(&*current, next) };
-                    unsafe { terminal_println!("current: {}, next: {}", (*current).id, next.id) };
+                unsafe {
+                    let next = (*current).next;
+                    if !next.is_null() {
+                        self.current = Some(next);
+                        switch(&*current, &*next);
+                    }
                 }
             }
         }
@@ -68,7 +72,6 @@ pub unsafe extern "C" fn switch(current: &ThreadControlBlock, next: &ThreadContr
         mov [rdi + {rdx_offset}], rdx
         mov [rdi + {rsi_offset}], rsi
         mov [rdi + {rdi_offset}], rdi
-        mov [rdi + {rsp_offset}], rsp
         mov [rdi + {rbp_offset}], rbp
         mov [rdi + {r8_offset}], r8
         mov [rdi + {r9_offset}], r9
@@ -78,42 +81,41 @@ pub unsafe extern "C" fn switch(current: &ThreadControlBlock, next: &ThreadContr
         mov [rdi + {r13_offset}], r13
         mov [rdi + {r14_offset}], r14
         mov [rdi + {r15_offset}], r15
+        mov [rdi + {rsp_offset}], rsp
 
 
-
-        mov rax, [rsi + {rsp_offset}]
-        mov rbx, [rsi + {rsp_offset}]
-        mov rcx, [rsi + {rsp_offset}]
-        mov rdx, [rsi + {rsp_offset}]
-        mov rdi, [rsi + {rsp_offset}]
         mov rsp, [rsi + {rsp_offset}]
-        mov rbp, [rsi + {rsp_offset}]
-        mov r8, [rsi + {rsp_offset}]
-        mov r9, [rsi + {rsp_offset}]
-        mov r10, [rsi + {rsp_offset}]
-        mov r11, [rsi + {rsp_offset}]
-        mov r12, [rsi + {rsp_offset}]
-        mov r13, [rsi + {rsp_offset}]
-        mov r14, [rsi + {rsp_offset}]
-        mov r15, [rsi + {rsp_offset}]
-        mov rdi, [rsi + {rsp_offset}]
+        mov rax, [rsi + {rax_offset}]
+        #mov rbx, [rsi + {rbx_offset}]
+        mov rcx, [rsi + {rcx_offset}]
+        mov rdx, [rsi + {rdx_offset}]
+        mov rbp, [rsi + {rbp_offset}]
+        mov r8, [rsi + {r8_offset}]
+        mov r9, [rsi + {r9_offset}]
+        mov r10, [rsi + {r10_offset}]
+        mov r11, [rsi + {r11_offset}]
+        mov r12, [rsi + {r12_offset}]
+        mov r13, [rsi + {r13_offset}]
+        mov r14, [rsi + {r14_offset}]
+        mov r15, [rsi + {r15_offset}]
+        mov rdi, [rsi + {rdi_offset}]
 
-        pop r15
-        pop r14
-        pop r13
-        pop r12
-        pop r11
-        pop r10
-        pop r9
-        pop r8
-        pop rbp
-        pop rsp
-        pop rdi
-        pop rsi
-        pop rdx
-        pop rcx
-        pop rbx
-        pop rax
+        #pop r15
+        #pop r14
+        #pop r13
+        #pop r12
+        #pop r11
+        #pop r10
+        #pop r9
+        #pop r8
+        #pop rbp
+        #pop rsp
+        #pop rdi
+        #pop rsi
+        #pop rdx
+        #pop rcx
+        #pop rbx
+        #pop rax
         ret
         ",
         rax_offset = const offset_of!(Registers, rax),
@@ -138,10 +140,12 @@ static CURRENT_COUNT: AtomicU64 = AtomicU64::new(0);
 static LAST_COUNT: AtomicU64 = AtomicU64::new(0);
 pub fn init_multitasking() {}
 pub fn init_scheduler() {
+    disable_interrupts();
     for i in 0..10 {
         let node = Box::into_raw(Box::new(ThreadControlBlock::new(i as u64)));
         add_process(node);
     }
+    enable_interrupts();
 }
 
 pub(crate) fn schedule() -> (*mut ThreadControlBlock, *mut ThreadControlBlock) {
