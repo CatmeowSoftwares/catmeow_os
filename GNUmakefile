@@ -159,6 +159,7 @@ $(IMAGE_NAME).iso: limine/limine kernel
 	tar -cvf ramdisk.tar "root"
 	mkdir -p iso_root
 	cp -v ramdisk.tar iso_root
+	rm ramdisk.tar
 
 ifeq ($(KARCH),x86_64)
 	cp -v limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/boot/limine/
