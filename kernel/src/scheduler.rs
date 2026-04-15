@@ -1,15 +1,11 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::boxed::Box;
 use spin::Mutex;
 
 use crate::{
-    gui::{put_pixel, put_rect},
     idt::{disable_interrupts, enable_interrupts},
-    process::{Process, ProcessControlBlock},
-    serial_println, terminal_println,
     thread::ThreadControlBlock,
-    tsc::get_ms,
 };
-use core::{mem::offset_of, ptr::null_mut, sync::atomic::AtomicU64};
+use core::{mem::offset_of, ptr::null_mut};
 
 pub static SCHEDULER: Mutex<Scheduler> = Mutex::new(Scheduler::new());
 unsafe impl Send for Scheduler {}
@@ -30,10 +26,16 @@ impl Scheduler {
         }
     }
     pub fn schedule(&mut self) {
+        if self.head.is_null() {
+            return;
+        }
         if self.current.is_none() {
             self.current = Some(self.head);
         } else {
             if let Some(current) = self.current {
+                if current.is_null() {
+                    return;
+                }
                 unsafe {
                     let next = (*current).next;
                     if !next.is_null() {
@@ -86,7 +88,7 @@ pub unsafe extern "C" fn switch(current: &ThreadControlBlock, next: &ThreadContr
 
         mov rsp, [rsi + {rsp_offset}]
         mov rax, [rsi + {rax_offset}]
-        #mov rbx, [rsi + {rbx_offset}]
+        mov rbx, [rsi + {rbx_offset}]
         mov rcx, [rsi + {rcx_offset}]
         mov rdx, [rsi + {rdx_offset}]
         mov rbp, [rsi + {rbp_offset}]
@@ -99,23 +101,22 @@ pub unsafe extern "C" fn switch(current: &ThreadControlBlock, next: &ThreadContr
         mov r14, [rsi + {r14_offset}]
         mov r15, [rsi + {r15_offset}]
         mov rdi, [rsi + {rdi_offset}]
-
-        #pop r15
-        #pop r14
-        #pop r13
-        #pop r12
-        #pop r11
-        #pop r10
-        #pop r9
-        #pop r8
-        #pop rbp
-        #pop rsp
-        #pop rdi
-        #pop rsi
-        #pop rdx
-        #pop rcx
-        #pop rbx
-        #pop rax
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop r11
+        pop r10
+        pop r9
+        pop r8
+        pop rbp
+        pop rsp
+        pop rdi
+        pop rsi
+        pop rdx
+        pop rcx
+        pop rbx
+        pop rax
         ret
         ",
         rax_offset = const offset_of!(Registers, rax),
@@ -136,8 +137,6 @@ pub unsafe extern "C" fn switch(current: &ThreadControlBlock, next: &ThreadContr
         r15_offset = const offset_of!(Registers, r15),
     )
 }
-static CURRENT_COUNT: AtomicU64 = AtomicU64::new(0);
-static LAST_COUNT: AtomicU64 = AtomicU64::new(0);
 pub fn init_multitasking() {}
 pub fn init_scheduler() {
     disable_interrupts();
@@ -146,34 +145,6 @@ pub fn init_scheduler() {
         add_process(node);
     }
     enable_interrupts();
-}
-
-pub(crate) fn schedule() -> (*mut ThreadControlBlock, *mut ThreadControlBlock) {
-    unsafe { SCHEDULER.force_unlock() };
-    let scheduler = SCHEDULER.try_lock();
-    match scheduler {
-        Some(mut scheduler) => {
-            if scheduler.current.is_none() {
-                scheduler.current = Some(scheduler.head);
-            } else {
-                if let Some(current) = scheduler.current {
-                    unsafe { scheduler.current = Some((*current).next) };
-                }
-            }
-            let current = scheduler.current;
-
-            if let Some(current) = current {
-                if let Some(next) = scheduler.current {
-                    (current, next)
-                } else {
-                    (null_mut(), null_mut())
-                }
-            } else {
-                (null_mut(), null_mut())
-            }
-        }
-        None => (null_mut(), null_mut()),
-    }
 }
 
 fn add_process(node: *mut ThreadControlBlock) {
@@ -193,14 +164,6 @@ fn add_process(node: *mut ThreadControlBlock) {
             (*node).next = scheduler.head;
             scheduler.tail = Some(node);
         }
-    }
-}
-fn remove_process() {}
-
-fn context_switch() {
-    let rsp: u64;
-    unsafe {
-        core::arch::asm!("mov {rsp}, rsp", rsp = out(reg) rsp);
     }
 }
 
@@ -223,11 +186,6 @@ pub struct Registers {
     pub r13: u64,
     pub r14: u64,
     pub r15: u64,
-}
-impl Registers {
-    fn new() -> Self {
-        Self::default()
-    }
 }
 
 #[unsafe(naked)]
@@ -311,8 +269,3 @@ pub unsafe extern "C" fn save_registers(register: &mut Registers) {
         r15_offset = const offset_of!(Registers, r15),
     );
 }
-fn save_current_regs() -> Registers {
-    let mut register = Registers::new();
-    register
-}
-fn load_bin(data: &[u8]) {}

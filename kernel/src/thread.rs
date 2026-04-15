@@ -26,26 +26,14 @@ impl Thread {
 fn create_thread() {
     let thread = Thread::new(0);
 }
-
+#[derive(Default)]
 pub struct ThreadControlBlock {
     pub id: u64,
     pub next: *mut ThreadControlBlock,
     pub registers: Registers,
     pub cr3: u64,
     pub esp0: u64,
-    pub stack: Box<[u8; PAGE_SIZE as usize]>,
-}
-impl Default for ThreadControlBlock {
-    fn default() -> Self {
-        Self {
-            id: 0,
-            next: null_mut(),
-            registers: Registers::default(),
-            cr3: 0,
-            esp0: 0,
-            stack: Box::new([0u8; PAGE_SIZE as usize]),
-        }
-    }
+    pub state: u8,
 }
 unsafe impl Sync for ThreadControlBlock {}
 
@@ -56,18 +44,10 @@ fn meow() -> ! {
 }
 impl ThreadControlBlock {
     pub(crate) fn new(id: u64) -> Self {
-        let mut tcb = Self {
+        let tcb = Self {
             id,
             ..Default::default()
         };
-        let stack = Box::new([0u8; PAGE_SIZE as usize]);
-        let top = stack.as_ptr() as u64 + PAGE_SIZE as u64;
-        let stack_top = top - 8;
-        unsafe {
-            *(stack_top as *mut u64) = meow as *mut u64 as u64;
-        }
-        tcb.registers.rsp = stack_top;
-        tcb.stack = stack;
         tcb
     }
 }

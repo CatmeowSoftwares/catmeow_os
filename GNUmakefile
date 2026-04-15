@@ -9,7 +9,7 @@ override USER_VARIABLE = $(if $(filter $(origin $(1)),default undefined),$(eval 
 $(call USER_VARIABLE,KARCH,x86_64)
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-$(call USER_VARIABLE,QEMUFLAGS,-m 2G -serial stdio -s -S)
+$(call USER_VARIABLE,QEMUFLAGS,-m 2G -serial stdio -s -S -d int -d cpu_reset -no-reboot -no-shutdown)
 
 override IMAGE_NAME := catmeow_os-$(KARCH)
 
