@@ -54,9 +54,9 @@ pub(crate) unsafe extern "x86-interrupt" fn timer_interrupt_handler(
     unsafe {
         outb(0x20, 0x20);
     }
-    unsafe { SCHEDULER.force_unlock() };
-    let mut scheduler = SCHEDULER.lock();
-    scheduler.schedule();
+    if let Some(mut scheduler) = SCHEDULER.try_lock() {
+        scheduler.schedule();
+    }
 }
 pub fn get_ms() -> u32 {
     MS_TICK.load(core::sync::atomic::Ordering::Relaxed)
