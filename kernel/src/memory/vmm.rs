@@ -119,7 +119,6 @@ pub static PAGE_MAP_LEVEL_4: Mutex<PageMapLevel4> = {
 pub fn init_vmm(phys_base: u64, virt_base: u64) {
     let kernel_offset = virt_base - phys_base;
     let test = u64::MAX;
-    terminal_println!("{:064b}", test & 0xffffffffff);
     let mut pml4 = PAGE_MAP_LEVEL_4.lock();
     let page_map_level_4 = &mut pml4.0;
     let hhdm = pmm::get_hhdm_offset();
@@ -128,7 +127,6 @@ pub fn init_vmm(phys_base: u64, virt_base: u64) {
     unsafe {
         asm!("mov {ptr}, cr3", ptr = out(reg) curr_cr3);
     }
-    terminal_println!("cr3: {}", curr_cr3);
     let lim_pml4 =
         unsafe { &*(((curr_cr3 & 0x000F_FFFF_FFFF_F000) + hhdm) as *const [PageTableEntry; 512]) };
     for i in 0..512 {
@@ -139,8 +137,6 @@ pub fn init_vmm(phys_base: u64, virt_base: u64) {
         asm!("
                 mov cr3, {0:r}", in(reg) ptr);
     }
-    terminal_println!();
-    terminal_println!("paging enabled");
 }
 pub fn get_physaddr(virtaddr: *mut u8) -> *mut u8 {
     let pml4 = PAGE_MAP_LEVEL_4.lock();
