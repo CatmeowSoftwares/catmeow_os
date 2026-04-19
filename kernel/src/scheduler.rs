@@ -3,7 +3,8 @@ use spin::Mutex;
 
 use crate::{
     idt::{disable_interrupts, enable_interrupts},
-    thread::ThreadControlBlock,
+    terminal_print, terminal_println,
+    thread::{ThreadControlBlock, ThreadStatus},
 };
 use core::{mem::offset_of, ptr::null_mut};
 
@@ -30,18 +31,27 @@ impl Scheduler {
             return;
         }
         if self.current.is_none() {
-            self.current = Some(self.head);
+            let first = self.head;
+            unsafe { (*first).status = ThreadStatus::Running };
+            self.current = Some(first);
         } else {
             if let Some(current) = self.current {
                 if current.is_null() {
                     return;
                 }
                 unsafe {
-                    let next = (*current).next;
-                    if !next.is_null() {
-                        self.current = Some(next);
-                        switch(&*current, &*next);
+                    let mut next = (*current).next;
+                    let start = next;
+                    while !next.is_null() && (*next).status != ThreadStatus::Ready {
+                        next = (*next).next;
+                        if next == start {
+                            return;
+                        }
                     }
+                    (*current).status = ThreadStatus::Ready;
+                    (*next).status = ThreadStatus::Running;
+                    self.current = Some(next);
+                    switch(&*current, &*next);
                 }
             }
         }
@@ -57,7 +67,6 @@ pub unsafe extern "C" fn switch(current: &ThreadControlBlock, next: &ThreadContr
         push rdx
         push rsi
         push rdi
-        push rsp
         push rbp
         push r8
         push r9
@@ -101,6 +110,7 @@ pub unsafe extern "C" fn switch(current: &ThreadControlBlock, next: &ThreadContr
         mov r14, [rsi + {r14_offset}]
         mov r15, [rsi + {r15_offset}]
         mov rdi, [rsi + {rdi_offset}]
+        #mov rip, [rsi + {rip}]
         pop r15
         pop r14
         pop r13
@@ -110,31 +120,31 @@ pub unsafe extern "C" fn switch(current: &ThreadControlBlock, next: &ThreadContr
         pop r9
         pop r8
         pop rbp
-        pop rsp
         pop rdi
         pop rsi
         pop rdx
         pop rcx
         pop rbx
         pop rax
-        ret
+        iretq
         ",
-        rax_offset = const offset_of!(Registers, rax),
-        rbx_offset = const offset_of!(Registers, rbx),
-        rcx_offset = const offset_of!(Registers, rcx),
-        rdx_offset = const offset_of!(Registers, rdx),
-        rsi_offset = const offset_of!(Registers, rsi),
-        rdi_offset = const offset_of!(Registers, rdi),
-        rsp_offset = const offset_of!(Registers, rsp),
-        rbp_offset = const offset_of!(Registers, rbp),
-        r8_offset = const offset_of!(Registers, r8),
-        r9_offset = const offset_of!(Registers, r9),
-        r10_offset = const offset_of!(Registers, r10),
-        r11_offset = const offset_of!(Registers, r11),
-        r12_offset = const offset_of!(Registers, r12),
-        r13_offset = const offset_of!(Registers, r13),
-        r14_offset = const offset_of!(Registers, r14),
-        r15_offset = const offset_of!(Registers, r15),
+        rax_offset = const offset_of!(ThreadControlBlock, registers.rax),
+        rbx_offset = const offset_of!(ThreadControlBlock, registers.rbx),
+        rcx_offset = const offset_of!(ThreadControlBlock, registers.rcx),
+        rdx_offset = const offset_of!(ThreadControlBlock, registers.rdx),
+        rsi_offset = const offset_of!(ThreadControlBlock, registers.rsi),
+        rdi_offset = const offset_of!(ThreadControlBlock, registers.rdi),
+        rsp_offset = const offset_of!(ThreadControlBlock, registers.rsp),
+        rbp_offset = const offset_of!(ThreadControlBlock, registers.rbp),
+        r8_offset = const offset_of!(ThreadControlBlock, registers.r8),
+        r9_offset = const offset_of!(ThreadControlBlock, registers.r9),
+        r10_offset = const offset_of!(ThreadControlBlock, registers.r10),
+        r11_offset = const offset_of!(ThreadControlBlock, registers.r11),
+        r12_offset = const offset_of!(ThreadControlBlock, registers.r12),
+        r13_offset = const offset_of!(ThreadControlBlock, registers.r13),
+        r14_offset = const offset_of!(ThreadControlBlock, registers.r14),
+        r15_offset = const offset_of!(ThreadControlBlock, registers.r15),
+        rip = const offset_of!(ThreadControlBlock, rip)
     )
 }
 pub fn init_multitasking() {}
@@ -144,18 +154,16 @@ pub fn init_scheduler() {
         let node = Box::into_raw(Box::new(ThreadControlBlock::new(i as u64)));
         add_process(node);
     }
-    enable_interrupts();
 }
 
 fn add_process(node: *mut ThreadControlBlock) {
     let mut scheduler = SCHEDULER.lock();
-
     if scheduler.head.is_null() {
         scheduler.head = node;
+        terminal_println!("gave head");
         unsafe {
-            (*node).next = scheduler.head;
+            (*node).next = node;
         }
-        scheduler.head = node;
         scheduler.tail = Some(node);
     } else {
         unsafe {
