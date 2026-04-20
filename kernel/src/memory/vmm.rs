@@ -63,9 +63,9 @@ pub fn allocate(start: u64, size: usize, flags: u64) {
         map_page(ptr, (start + i as u64 * PAGE_SIZE) as *mut u8, flags);
     }
 }
-pub fn allocate_page(size: usize, flags: u64) -> u64 {
+pub fn allocate_page(flags: u64) -> u64 {
     let ptr = pmm::allocate();
-    let virt = (ptr as u64 + get_hhdm_offset());
+    let virt = ptr as u64 + get_hhdm_offset();
     map_page(ptr, virt as *mut u8, flags);
     virt
 }
