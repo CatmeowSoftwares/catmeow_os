@@ -49,7 +49,7 @@ impl ProcessControlBlock {
         };
         let mut page_table_entry = PageTableEntry::new();
         page_table_entry.set_writable(true);
-        let page = allocate_page(PAGE_SIZE as usize, 3);
+        let page = allocate_page(3);
         let stack_top = page + PAGE_SIZE;
         unsafe {
             *((stack_top - 8) as *mut u64) = 0;
