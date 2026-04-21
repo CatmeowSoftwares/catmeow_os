@@ -126,98 +126,219 @@ fn lidt(idtr: &IDTR) {
     }
 }
 
-unsafe extern "x86-interrupt" fn exception_handler(stack_frame: InterruptStackFrame) {
-    panic!("exception!: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn exception_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!("exception!: {:#x?}, err code: {}", stack_frame, error_code);
 }
 
-unsafe extern "x86-interrupt" fn divide_error_handler(stack_frame: InterruptStackFrame) {
-    panic!("divide error: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn divide_error_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "divide error: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
-unsafe extern "x86-interrupt" fn debug_exception_handler(stack_frame: InterruptStackFrame) {
-    panic!("debug exception: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn debug_exception_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "debug exception: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
 
-unsafe extern "x86-interrupt" fn nmi_interrupt_handler(stack_frame: InterruptStackFrame) {
-    panic!("nmi interrupt: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn nmi_interrupt_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "nmi interrupt: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
-unsafe extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
-    panic!("breakpoint: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn breakpoint_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!("breakpoint: {:#x?}, err code: {}", stack_frame, error_code);
 }
-unsafe extern "x86-interrupt" fn overflow_handler(stack_frame: InterruptStackFrame) {
-    panic!("overflow: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn overflow_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!("overflow: {:#x?}, err code: {}", stack_frame, error_code);
 }
-unsafe extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: InterruptStackFrame) {
-    panic!("bound range exceeded: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn bound_range_exceeded_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "bound range exceeded: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
-unsafe extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFrame) {
-    panic!("invalid opcode: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn invalid_opcode_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "invalid opcode: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
-unsafe extern "x86-interrupt" fn device_not_available_handler(stack_frame: InterruptStackFrame) {
-    panic!("device not available: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn device_not_available_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "device not available: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
-unsafe extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame) {
-    panic!("double fault: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn double_fault_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "double fault: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
 unsafe extern "x86-interrupt" fn coprocessor_segment_overrun_handler(
     stack_frame: InterruptStackFrame,
+    error_code: u64,
 ) {
-    panic!("coprocessor segment overrun: {:#x?}", stack_frame);
+    panic!(
+        "coprocessor segment overrun: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
-unsafe extern "x86-interrupt" fn invalid_tss_handler(stack_frame: InterruptStackFrame) {
-    panic!("invalid tss: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn invalid_tss_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!("invalid tss: {:#x?}, err code: {}", stack_frame, error_code);
 }
-unsafe extern "x86-interrupt" fn segment_not_present_handler(stack_frame: InterruptStackFrame) {
-    panic!("segment not present: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn segment_not_present_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "segment not present: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
 
-unsafe extern "x86-interrupt" fn stack_segment_fault_handler(stack_frame: InterruptStackFrame) {
-    panic!("stack segment fault: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn stack_segment_fault_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "stack segment fault: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
 
-unsafe extern "x86-interrupt" fn general_protection_handler(stack_frame: InterruptStackFrame) {
-    panic!("general protection: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn general_protection_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "general protection: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
 
-unsafe extern "x86-interrupt" fn page_fault_handler(stack_frame: InterruptStackFrame) {
-    panic!("page fault: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn page_fault_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!("page fault: {:#x?}, err code: {}", stack_frame, error_code);
 }
 
 unsafe extern "x86-interrupt" fn x87_fpu_floating_point_error_handler(
     stack_frame: InterruptStackFrame,
+    error_code: u64,
 ) {
-    panic!("x87_fpu_floating_point_error: {:#x?}", stack_frame);
+    panic!(
+        "x87_fpu_floating_point_error: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
-unsafe extern "x86-interrupt" fn alignment_check_handler(stack_frame: InterruptStackFrame) {
-    panic!("alignment check: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn alignment_check_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "alignment check: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
-unsafe extern "x86-interrupt" fn machine_check_handler(stack_frame: InterruptStackFrame) {
-    panic!("machine check: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn machine_check_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "machine check: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
 unsafe extern "x86-interrupt" fn simd_floating_point_exception_handler(
     stack_frame: InterruptStackFrame,
+    error_code: u64,
 ) {
-    panic!("simd floating point exception: {:#x?}", stack_frame);
+    panic!(
+        "simd floating point exception: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
 unsafe extern "x86-interrupt" fn virtualization_exception_handler(
     stack_frame: InterruptStackFrame,
+    error_code: u64,
 ) {
-    panic!("virtualization exeption: {:#x?}", stack_frame);
+    panic!(
+        "virtualization exeption: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
 unsafe extern "x86-interrupt" fn control_protection_exception_handler(
     stack_frame: InterruptStackFrame,
+    error_code: u64,
 ) {
-    panic!("control_protection_exception: {:#x?}", stack_frame);
+    panic!(
+        "control_protection_exception: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
 unsafe extern "x86-interrupt" fn hypervisor_injection_exception_handler(
     stack_frame: InterruptStackFrame,
+    error_code: u64,
 ) {
-    panic!("hypervisor injection exception: {:#x?}", stack_frame);
+    panic!(
+        "hypervisor injection exception: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
 unsafe extern "x86-interrupt" fn vmm_communication_exception_handler(
     stack_frame: InterruptStackFrame,
+    error_code: u64,
 ) {
-    panic!("vmm communication exception: {:#x?}", stack_frame);
+    panic!(
+        "vmm communication exception: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
-unsafe extern "x86-interrupt" fn security_exception_handler(stack_frame: InterruptStackFrame) {
-    panic!("security exception: {:#x?}", stack_frame);
+unsafe extern "x86-interrupt" fn security_exception_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    panic!(
+        "security exception: {:#x?}, err code: {}",
+        stack_frame, error_code
+    );
 }
