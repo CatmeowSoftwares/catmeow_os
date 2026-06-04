@@ -30,7 +30,6 @@ impl Scheduler {
         if self.head.is_null() {
             return;
         }
-        serial_println!("c");
         if self.current.is_none() {
             let first = self.head;
             unsafe { (*first).status = ThreadStatus::Running };
@@ -42,25 +41,10 @@ impl Scheduler {
                 }
                 unsafe {
                     let next = (*current).next;
-                    /*
-
-                    let start = next;
-                    loop {
-                        if (*next).status != ThreadStatus::Ready {
-                            break;
-                        }
-                        next = (*next).next;
-                        if next == start {
-                            return;
-                        }
-                    }
-                    */
                     (*current).status = ThreadStatus::Ready;
                     (*next).status = ThreadStatus::Running;
                     switch(&(*current).registers.rsp, &(*next).registers.rsp);
                     self.current = Some(next);
-                    serial_println!("s!");
-                    serial_println!("c: {}!", (*current).id);
                 }
             }
         }
