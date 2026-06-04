@@ -18,10 +18,19 @@ use catmeow_os::memory::{
 use catmeow_os::pit::{get_ms, init_pit, remap_pic};
 use catmeow_os::scheduler::init_scheduler;
 use catmeow_os::serial::init_serial;
+
+#[cfg(target_arch = "aarch64")]
+use catmeow_os::arch::aarch64;
+#[cfg(target_arch = "loongarch64")]
+use catmeow_os::arch::loongarch64;
+#[cfg(target_arch = "riscv64")]
+use catmeow_os::arch::riscv64;
 #[cfg(target_arch = "x86_64")]
-use catmeow_os::serial_print;
+use catmeow_os::arch::x86_64;
+
 use catmeow_os::terminal::init_terminal;
 use catmeow_os::tsc::init_tsc;
+use catmeow_os::tss::TSS;
 use catmeow_os::{acpi, serial_println, terminal_println};
 use limine::BaseRevision;
 use limine::modules::{InternalModule, ModuleFlags};
@@ -85,6 +94,7 @@ static _END_MARKER: RequestsEndMarker = RequestsEndMarker::new();
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn kmain() -> ! {
+    catmeow_os::run();
     // All limine requests must also be referenced in a called function, otherwise they may be
     // removed by the linker.
     assert!(BASE_REVISION.is_supported());
@@ -129,18 +139,10 @@ unsafe extern "C" fn kmain() -> ! {
     }
     if let Some(paging_mode_response) = PAGING_MODE_REQUEST.get_response() {
         let mode = paging_mode_response.mode();
-        if mode == Mode::DEFAULT {
-            terminal_println!("default paging");
-        }
-        if mode == Mode::FIVE_LEVEL {
-            terminal_println!("five level paging");
-        }
-        if mode == Mode::FOUR_LEVEL {
-            terminal_println!("four level paging");
-        }
-        if mode == Mode::MIN {
-            terminal_println!("min paging paging")
-        }
+        if mode == Mode::DEFAULT {}
+        if mode == Mode::FIVE_LEVEL {}
+        if mode == Mode::FOUR_LEVEL {}
+        if mode == Mode::MIN {}
     }
     if let Some(executable_address_response) = EXECUTABLE_ADDRESS_REQUEST.get_response() {
         let physical_base = executable_address_response.physical_base();
@@ -153,28 +155,13 @@ unsafe extern "C" fn kmain() -> ! {
         let rsdp_address = rsdp_response.address();
         //acpi::init_acpi(rsdp_address);
     }
-    if let Some(mp_response) = MP_REQUEST.get_response() {
-        terminal_println!("cpu len: {:?}", mp_response.cpus().len());
-        for cpu in mp_response.cpus() {
-            terminal_println!("cpu: {:?}", cpu.id);
-            terminal_println!("cpu lapic id: {:?}", cpu.lapic_id);
-        }
-    }
-
+    if let Some(mp_response) = MP_REQUEST.get_response() {}
     heap::init_heap();
     terminal_println!("KHEAP INITIALIZED");
-    let mut v = vec![1, 2, 3];
-    v.push(67);
-    v.push(41);
-    v.push(255);
-    for i in v {
-        terminal_println!("{}", i);
-    }
     init_filesystem(get_ramdisk_file());
     terminal_println!("FILESYSTEM INITIALIZED");
     init_scheduler();
     terminal_println!("SCHEDULER INITIALIZED");
-
     terminal_println!("end");
     enable_interrupts();
     hcf();

@@ -2,7 +2,10 @@ use core::arch::{asm, global_asm};
 
 use spin::Mutex;
 
-use crate::terminal_println;
+use crate::{
+    terminal_println,
+    tss::{TSS, Tss},
+};
 const GDTBASE: u64 = 0x00000800;
 
 const fn seg_desktype(x: u16) -> u16 {
@@ -81,6 +84,8 @@ const GDT_DATA_PL3: u16 = seg_desktype(1)
     | seg_gran(1)
     | seg_priv(3)
     | SEG_DATA_RDWR;
+
+const GDT_TSS: u16 = seg_present(1) | seg_priv(0) | 0x09;
 pub type GDT = GlobalDescriptorTableRegister;
 #[repr(C, packed)]
 pub struct GlobalDescriptorTableRegister {
@@ -96,21 +101,30 @@ impl GlobalDescriptorTableRegister {
 
 static GDTR: Mutex<GlobalDescriptorTableRegister> =
     Mutex::new(GlobalDescriptorTableRegister::new());
-static GDT: Mutex<[u64; 6]> = Mutex::new([0u64; 6]);
+static GDT: Mutex<[u64; 7]> = Mutex::new([0u64; 7]);
 
 pub fn init_gdt() {
     let mut gdt = GDT.lock();
+    let tss = TSS.lock();
     gdt[0] = create_descriptor(0, 0, 0);
     gdt[1] = create_descriptor(0, 0x000FFFFF, GDT_CODE_PL0);
     gdt[2] = create_descriptor(0, 0x000FFFFF, GDT_DATA_PL0);
     gdt[3] = create_descriptor(0, 0x000FFFFF, GDT_CODE_PL3);
     gdt[4] = create_descriptor(0, 0x000FFFFF, GDT_DATA_PL3);
-
+    let tss_addr = &*tss as *const Tss as u64;
+    gdt[5] = create_descriptor(
+        &*tss as *const Tss as *mut Tss as u64,
+        size_of::<Tss>() as u64 - 1,
+        GDT_TSS,
+    );
+    gdt[6] = tss_addr >> 32;
     let mut gdtr = GDTR.lock();
     gdtr.limit = (size_of_val(&*gdt) - 1) as u16;
     gdtr.base = gdt.as_ptr() as u64;
     lgdt(&*gdtr);
     reload_segments();
+    unsafe { core::arch::asm!("ltr {0:x}", in(reg) 0x28u16, options(nostack, preserves_flags)) };
+    terminal_println!("{:#?}", *tss)
 }
 
 fn reload_segments() {
@@ -137,7 +151,7 @@ fn lgdt(gdt: *const GlobalDescriptorTableRegister) {
     unsafe { asm!("lgdt [{}]", in(reg) gdt, options(readonly, nostack, preserves_flags)) }
 }
 
-pub fn create_descriptor(base: u32, limit: u32, flag: u16) -> u64 {
+pub fn create_descriptor(base: u64, limit: u64, flag: u16) -> u64 {
     let mut descriptor;
 
     descriptor = (limit & 0x000F0000) as u64;

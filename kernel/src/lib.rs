@@ -16,3 +16,6 @@ pub mod serial;
 pub mod terminal;
 pub mod thread;
 pub mod tsc;
+pub mod tss;
+
+pub fn run() {}

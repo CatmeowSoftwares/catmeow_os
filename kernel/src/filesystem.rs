@@ -1,10 +1,10 @@
 use core::slice;
 
-use limine::file::File;
-
 use crate::{arch::arch::loop_halt, serial_println, terminal_println};
+use alloc::vec::Vec;
+use limine::file::File as LimineFile;
 
-pub fn init_filesystem(file: &File) {
+pub fn init_filesystem(file: &LimineFile) {
     let data = unsafe { slice::from_raw_parts_mut(file.addr(), file.size() as usize) };
     let result = tar_no_std::TarArchiveRef::new(data);
     match result {
@@ -20,4 +20,12 @@ pub fn init_filesystem(file: &File) {
         }
     }
     //loop_halt();
+}
+
+struct File {
+    data: Vec<u8>,
+}
+
+struct Directory {
+    files: Vec<*mut File>,
 }
