@@ -41,9 +41,10 @@ impl Scheduler {
                     return;
                 }
                 unsafe {
-                    let mut next = (*current).next;
-                    let start = next;
+                    let next = (*current).next;
                     /*
+
+                    let start = next;
                     loop {
                         if (*next).status != ThreadStatus::Ready {
                             break;
@@ -56,7 +57,7 @@ impl Scheduler {
                     */
                     (*current).status = ThreadStatus::Ready;
                     (*next).status = ThreadStatus::Running;
-                    switch((*current).registers.rsp, (*next).registers.rsp);
+                    switch(&(*current).registers.rsp, &(*next).registers.rsp);
                     self.current = Some(next);
                     serial_println!("s!");
                     serial_println!("c: {}!", (*current).id);
@@ -66,7 +67,7 @@ impl Scheduler {
     }
 }
 #[unsafe(naked)]
-pub unsafe extern "C" fn switch(current: u64, next: u64) {
+pub unsafe extern "C" fn switch(current: *const u64, next: *const u64) {
     core::arch::naked_asm!(
         "
         cli
