@@ -43,12 +43,17 @@ impl Scheduler {
                     let next = (*current).next;
                     (*current).status = ThreadStatus::Ready;
                     (*next).status = ThreadStatus::Running;
+                    test();
                     switch(&(*current).registers.rsp, &(*next).registers.rsp);
                     self.current = Some(next);
                 }
             }
         }
     }
+}
+fn test() {
+    serial_println!("c");
+    return;
 }
 #[unsafe(naked)]
 pub unsafe extern "C" fn switch(current: *const u64, next: *const u64) {
@@ -98,6 +103,7 @@ pub unsafe extern "C" fn switch(current: *const u64, next: *const u64) {
         #add rsp,16
         #sti
         #iretq
+        push rax
         ret
         ",
     )

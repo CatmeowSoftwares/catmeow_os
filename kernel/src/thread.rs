@@ -1,4 +1,5 @@
 use core::{
+    arch::naked_asm,
     default,
     ptr::{null_mut, write_bytes},
 };
@@ -12,7 +13,7 @@ use crate::{
         vmm,
     },
     process::ProcessControlBlock,
-    scheduler::Registers,
+    scheduler::{Registers, SCHEDULER},
     terminal_println,
 };
 
@@ -54,7 +55,6 @@ pub struct ThreadControlBlock {
     pub esp0: u64,
     pub rip: u64,
     pub status: ThreadStatus,
-    pub function: fn(),
 }
 impl Default for ThreadControlBlock {
     fn default() -> Self {
@@ -66,19 +66,18 @@ impl Default for ThreadControlBlock {
             esp0: 0,
             rip: 0,
             status: ThreadStatus::default(),
-            function: meow,
         }
     }
 }
 unsafe impl Sync for ThreadControlBlock {}
 
 fn meow() {
-    loop {
-        terminal_println!("meow :3");
-        if let Some(scheduler) = crate::scheduler::SCHEDULER.try_lock() {
-            terminal_println!("from: {:?}", scheduler.current);
-        }
-    }
+    terminal_println!("meow :3");
+    syscall();
+}
+#[unsafe(naked)]
+extern "C" fn syscall() {
+    naked_asm!("syscall");
 }
 impl ThreadControlBlock {
     pub(crate) fn new(id: u64) -> Self {
@@ -88,6 +87,11 @@ impl ThreadControlBlock {
         };
         let ptr = vmm::allocate_page(3) as u64;
         let stack_top = ptr + PAGE_SIZE;
+        let stack_ptr = stack_top as *mut u64;
+        unsafe {
+            *stack_ptr = meow as *const u64 as u64;
+        }
+        //tcb.registers.rax = meow as *const u64 as u64;
         tcb.registers.rsp = stack_top;
 
         unsafe {
