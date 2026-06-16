@@ -2,11 +2,11 @@ use alloc::boxed::Box;
 use spin::Mutex;
 
 use crate::{
-    idt::{disable_interrupts, enable_interrupts},
-    serial_println, terminal_print, terminal_println,
+    idt::disable_interrupts,
+    serial_println, terminal_println,
     thread::{ThreadControlBlock, ThreadStatus},
 };
-use core::{mem::offset_of, ptr::null_mut};
+use core::ptr::null_mut;
 
 pub static SCHEDULER: Mutex<Scheduler> = Mutex::new(Scheduler::new());
 unsafe impl Send for Scheduler {}
@@ -100,10 +100,8 @@ pub unsafe extern "C" fn switch(current: *const u64, next: *const u64) {
         pop r13
         pop r14
         pop r15
-        #add rsp,16
-        #sti
-        #iretq
         push rax
+        sti
         ret
         ",
     )

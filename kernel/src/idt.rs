@@ -80,6 +80,7 @@ pub fn init_idt() {
         idt_set_descriptor(i as u8, exception_handler as *mut u8, 0x8e);
     }
     idt_set_descriptor(0x20, crate::pit::timer_interrupt_handler as *mut u8, 0x8e);
+    idt_set_descriptor(0x80, syscall_handler as *mut u8, 0x8e);
     idt_set_descriptor(0, divide_error_handler as *mut u8, 0x8e);
     idt_set_descriptor(1, debug_exception_handler as *mut u8, 0x8e);
     idt_set_descriptor(2, nmi_interrupt_handler as *mut u8, 0x8e);
@@ -109,7 +110,7 @@ pub fn init_idt() {
     lidt(&*idtr);
     enable_interrupts();
 }
-
+fn syscall_handler() {}
 pub fn disable_interrupts() {
     unsafe {
         asm!("cli", options(nostack));

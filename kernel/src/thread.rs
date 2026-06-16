@@ -1,20 +1,9 @@
-use core::{
-    arch::naked_asm,
-    default,
-    ptr::{null_mut, write_bytes},
-};
-
-use alloc::boxed::Box;
+use core::{arch::naked_asm, ptr::null_mut};
 
 use crate::{
-    memory::{
-        PAGE_SIZE,
-        pmm::{self, get_hhdm_offset},
-        vmm,
-    },
+    memory::{PAGE_SIZE, vmm},
     process::ProcessControlBlock,
-    scheduler::{Registers, SCHEDULER},
-    terminal_println,
+    scheduler::Registers,
 };
 
 #[derive(Default)]
@@ -72,12 +61,17 @@ impl Default for ThreadControlBlock {
 unsafe impl Sync for ThreadControlBlock {}
 
 fn meow() {
-    terminal_println!("meow :3");
-    syscall();
+    loop {
+        unsafe {
+            core::arch::asm!("hlt");
+        }
+        //terminal_println!("meow :3");
+        //syscall();
+    }
 }
 #[unsafe(naked)]
 extern "C" fn syscall() {
-    naked_asm!("syscall");
+    naked_asm!("int 0x80");
 }
 impl ThreadControlBlock {
     pub(crate) fn new(id: u64) -> Self {
